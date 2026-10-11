@@ -28,7 +28,13 @@ export async function POST(req: Request) {
       x.paypal.subscriptionId = sub.id; x.paypal.subscriptionStatus = sub.status;
       links.push({ label: o.label, url: sub.links.find((l: any) => l.rel === "approve").href });
     }
+    let webhook: string | undefined;
+    if (origin.startsWith("https://")) {
+      const url = `${origin}/api/webhooks/paypal`;
+      const hooks = await paypal.listWebhooks();
+      webhook = hooks.webhooks?.find((w: any) => w.url === url)?.id ?? (await paypal.createWebhook(url)).id;
+    }
     save(s);
-    return NextResponse.json({ productId: s.productId, planIds: s.planIds, links });
+    return NextResponse.json({ productId: s.productId, planIds: s.planIds, links, webhook });
   } catch (e: any) { save(s); return NextResponse.json({ error: String(e.message) }, { status: 500 }); }
 }

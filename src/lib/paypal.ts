@@ -68,6 +68,19 @@ export const getCapture = (captureId: string) => pp("GET", `/v2/payments/capture
 export const refundCapture = (captureId: string, amount: string, note: string, requestId: string) =>
   pp("POST", `/v2/payments/captures/${captureId}/refund`, { amount: { value: amount, currency_code: "USD" }, note_to_payer: note.slice(0, 255) }, { requestId, summary: `refund $${amount}` });
 
+// ── Disputes ──
+export const listDisputes = () => pp("GET", "/v1/customer/disputes?dispute_state=OPEN_INQUIRIES,REQUIRED_ACTION,UNDER_PAYPAL_REVIEW&page_size=20", undefined, { summary: "list open disputes" });
+
+// ── Webhooks: PayPal pushes real events (subscription suspended, refund completed, dispute created) ──
+export const WEBHOOK_EVENTS = ["BILLING.SUBSCRIPTION.SUSPENDED", "BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.UPDATED", "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.REFUNDED", "CUSTOMER.DISPUTE.CREATED", "CUSTOMER.DISPUTE.UPDATED"];
+export const listWebhooks = () => pp("GET", "/v1/notifications/webhooks", undefined, { summary: "list webhooks" });
+export const createWebhook = (url: string) => pp("POST", "/v1/notifications/webhooks", { url, event_types: WEBHOOK_EVENTS.map(name => ({ name })) }, { summary: "register webhook" });
+export const listWebhookEvents = () => pp("GET", "/v1/notifications/webhooks-events?page_size=25", undefined, { summary: "list webhook events" });
+export const verifyWebhook = (h: Headers, webhookId: string, event: unknown) => pp("POST", "/v1/notifications/verify-webhook-signature", {
+  auth_algo: h.get("paypal-auth-algo"), cert_url: h.get("paypal-cert-url"), transmission_id: h.get("paypal-transmission-id"),
+  transmission_sig: h.get("paypal-transmission-sig"), transmission_time: h.get("paypal-transmission-time"), webhook_id: webhookId, webhook_event: event,
+}, { summary: "verify webhook signature" });
+
 // ── Reporting ──
 export const listTransactions = (start: string, end: string) =>
   pp("GET", `/v1/reporting/transactions?start_date=${start}&end_date=${end}&fields=all&page_size=100`, undefined, { summary: "list transactions" });

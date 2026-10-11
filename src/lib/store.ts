@@ -20,6 +20,7 @@ export type Decision = {
   paypal: string[];              // PayPal API calls made for this decision
   status: "executed" | "awaiting_approval" | "blocked" | "simulated";
   message?: string;              // message sent to the customer
+  investigation?: string[];      // read-only PayPal lookups the agent chose to make before deciding
 };
 
 export type Subscriber = {
@@ -106,4 +107,18 @@ export function riskScore(x: Subscriber) {
   if (x.lastChargeDaysAgo !== null && x.lastChargeDaysAgo <= 3) r += 0.1;
   if (x.supportMessage && /dispute|bank|chargeback|forgot to cancel|refund/i.test(x.supportMessage)) r += 0.3;
   return Math.min(1, Math.round(r * 100) / 100);
+}
+
+// Expected chargeback exposure (model estimate): before = every at-risk renewal untouched;
+// after = residual risk once SubGuard acted (pause/refund remove most of it, remind/downgrade part of it).
+const RESIDUAL: Record<string, number> = { pause: 0.05, refund: 0.05, downgrade: 0.3, remind: 0.4, escalate: 0.6 };
+export function exposure(s: Store) {
+  let before = 0, after = 0;
+  for (const x of s.subscribers) {
+    const e = riskScore(x) * ((x.paypal.chargeAmount ?? PRICE[x.plan]) + CHARGEBACK_FEE);
+    before += e;
+    const d = x.decisions[0];
+    after += d && d.status !== "blocked" ? e * (RESIDUAL[d.action] ?? 1) : e;
+  }
+  return { before: Math.round(before * 100) / 100, after: Math.round(after * 100) / 100 };
 }

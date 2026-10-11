@@ -1,15 +1,15 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AgGridReact } from "ag-grid-react";
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef } from "ag-grid-community";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-type Decision = { at: string; action: string; reasoning: string; chargebackRisk: number; expectedLoss: number; actionCost: number; guardrails: string[]; paypal: string[]; status: string; message?: string };
+type Decision = { investigation?: string[]; at: string; action: string; reasoning: string; chargebackRisk: number; expectedLoss: number; actionCost: number; guardrails: string[]; paypal: string[]; status: string; message?: string };
 type Sub = { id: string; name: string; email: string; plan: string; monthsSubscribed: number; lastActiveDays: number; skippedShipments: number; emailsUnopened: number; renewalInDays: number; lastChargeDaysAgo: number | null; supportMessage?: string; status: string; paypal: Record<string, any>; decisions: Decision[]; risk: number };
 type Dispute = { id: string; subscriberId: string; reason: string; amount: number; buyerNote: string; facts: Record<string, any>; status: string; decision?: Decision; evidence?: string[] };
-type State = { merchant: string; subscribers: Sub[]; disputes: Dispute[]; saved: { preventedChargebacks: number; dollarsSaved: number; refundsIssued: number }; injectionBlocks: { at: string; subscriberId: string; excerpt: string }[]; apiCalls: { at: string; method: string; path: string; status: number; ok: boolean; summary: string }[] };
+type State = { exposure: { before: number; after: number }; merchant: string; subscribers: Sub[]; disputes: Dispute[]; saved: { preventedChargebacks: number; dollarsSaved: number; refundsIssued: number }; injectionBlocks: { at: string; subscriberId: string; excerpt: string }[]; apiCalls: { at: string; method: string; path: string; status: number; ok: boolean; summary: string }[] };
 
 const ACTION_LABEL: Record<string, string> = { remind: "Reminder sent", pause: "Paused", downgrade: "Downgraded", refund: "Refunded", escalate: "Escalated", no_action: "No action", accept_dispute: "Accepted", contest_dispute: "Contested" };
 const STATUS_TONE: Record<string, string> = { executed: "bg-emerald-50 text-emerald-700 ring-emerald-200", awaiting_approval: "bg-amber-50 text-amber-700 ring-amber-200", blocked: "bg-rose-50 text-rose-700 ring-rose-200", simulated: "bg-slate-100 text-slate-600 ring-slate-200" };
@@ -33,6 +33,10 @@ export default function Home() {
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState<string | null>(null);
+  const [quick, setQuick] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [events, setEvents] = useState<{ id: string; type: string; at: string; summary: string; resource?: string }[] | null>(null);
+  const grid = useRef<AgGridReact<Sub>>(null);
 
   const refresh = useCallback(async () => setSt(await (await fetch("/api/state", { cache: "no-store" })).json()), []);
   useEffect(() => { fetch("/api/state", { cache: "no-store" }).then(r => r.json()).then(setSt); }, []);
@@ -42,19 +46,22 @@ export default function Home() {
     try { const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) setErr(j.error ?? "Something went wrong"); }
     finally { setBusy(b => ({ ...b, [key]: false })); await refresh(); }
   };
+  const runSelected = async () => { for (const id of selected) await post("/api/agent", { subscriberId: id }, id); };
+  const loadEvents = async () => setEvents((await (await fetch("/api/events", { cache: "no-store" })).json()).events);
   const runAtRisk = async () => {
     if (!st) return;
     for (const x of st.subscribers.filter(z => z.risk >= 0.5 && !z.decisions.length)) await post("/api/agent", { subscriberId: x.id }, x.id);
   };
 
   const cols = useMemo<ColDef<Sub>[]>(() => [
-    { field: "name", headerName: "Subscriber", flex: 1.3, minWidth: 160, cellRenderer: (p: any) => <span className="font-medium text-slate-900">{p.value}</span> },
-    { field: "plan", width: 90 },
-    { field: "risk", headerName: "Risk", width: 140, sort: "desc", cellRenderer: (p: any) => <div className="flex items-center gap-2 h-full"><div className="h-1.5 w-16 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full ${p.value >= 0.6 ? "bg-rose-500" : p.value >= 0.35 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${p.value * 100}%` }} /></div><span className="tabular-nums text-slate-600">{Math.round(p.value * 100)}</span></div> },
-    { headerName: "Signals", flex: 2, minWidth: 220, valueGetter: (p) => signals(p.data!), cellClass: "text-slate-500" },
-    { field: "renewalInDays", headerName: "Renews", width: 100, valueFormatter: (p) => `in ${p.value}d` },
-    { headerName: "Agent decision", flex: 1.2, minWidth: 170, valueGetter: (p) => p.data!.decisions[0]?.action ?? "", cellRenderer: (p: any) => { const d: Decision | undefined = p.data.decisions[0]; return d ? <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${STATUS_TONE[d.status]}`}>{ACTION_LABEL[d.action]}{d.status === "awaiting_approval" ? " · needs approval" : ""}</span> : <span className="text-slate-300">—</span>; } },
-    { headerName: "", width: 120, sortable: false, cellRenderer: (p: any) => <button onClick={(e) => { e.stopPropagation(); post("/api/agent", { subscriberId: p.data.id }, p.data.id); }} disabled={busy[p.data.id]} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40">{busy[p.data.id] ? "Thinking…" : "Run agent"}</button> },
+    { field: "name", headerName: "Subscriber", pinned: "left", filter: "agTextColumnFilter", flex: 1.3, minWidth: 170, cellRenderer: (p: any) => <span className="font-medium text-slate-900">{p.value}</span> },
+    { field: "plan", width: 95, filter: "agTextColumnFilter" },
+    { field: "status", width: 110, filter: "agTextColumnFilter", cellRenderer: (p: any) => <span className="capitalize text-slate-600">{p.value}</span> },
+    { field: "risk", headerName: "Risk", width: 150, sort: "desc", filter: "agNumberColumnFilter", cellRenderer: (p: any) => <div className="flex items-center gap-2 h-full"><div className="h-1.5 w-16 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full ${p.value >= 0.6 ? "bg-rose-500" : p.value >= 0.35 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${p.value * 100}%` }} /></div><span className="tabular-nums text-slate-600">{Math.round(p.value * 100)}</span></div> },
+    { headerName: "Signals", flex: 2, minWidth: 170, valueGetter: (p) => signals(p.data!), cellClass: "text-slate-500" },
+    { field: "renewalInDays", headerName: "Renews", width: 120, filter: "agNumberColumnFilter", valueFormatter: (p) => `in ${p.value}d` },
+    { headerName: "Agent decision", flex: 1.2, minWidth: 150, valueGetter: (p) => p.data!.decisions[0]?.action ?? "", cellRenderer: (p: any) => { const d: Decision | undefined = p.data.decisions[0]; return d ? <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${STATUS_TONE[d.status]}`}>{ACTION_LABEL[d.action]}{d.status === "awaiting_approval" ? " · needs approval" : ""}</span> : <span className="text-slate-300">—</span>; } },
+    { headerName: "", width: 112, sortable: false, pinned: "right", cellRenderer: (p: any) => <button onClick={(e) => { e.stopPropagation(); post("/api/agent", { subscriberId: p.data.id }, p.data.id); }} disabled={busy[p.data.id]} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40">{busy[p.data.id] ? "Thinking…" : "Run agent"}</button> },
   ], [busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!st) return <div className="p-10 text-slate-400">Loading…</div>;
@@ -78,6 +85,15 @@ export default function Home() {
       <main className="mx-auto max-w-7xl px-6 py-6">
         <p className="mb-5 max-w-3xl text-sm text-slate-500">40% of US card disputes are &ldquo;cancelled recurring transaction&rdquo; (CFPB). SubGuard watches every subscriber and acts <b className="text-slate-700">before</b> a forgotten renewal becomes a chargeback — then fights the disputes worth fighting.</p>
 
+        <section className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-r from-[#0b1f4d] to-[#0b5fff] p-5 text-white">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div><div className="text-xs font-semibold uppercase tracking-widest text-blue-100">Expected chargeback exposure (model estimate)</div>
+              <div className="mt-1 flex items-baseline gap-3"><span className="text-3xl font-semibold tabular-nums line-through decoration-2 opacity-60">{money(st.exposure.before)}</span><span className="text-xl">→</span><span className="text-4xl font-bold tabular-nums">{money(st.exposure.after)}</span></div>
+              <div className="mt-1 text-sm text-blue-100">Risk-weighted (charge + $15 fee) across {st.subscribers.length} subscribers, before vs. after SubGuard acted.</div></div>
+            <div className="w-full max-w-sm"><div className="flex justify-between text-xs text-blue-100"><span>Exposure removed</span><span className="tabular-nums">{st.exposure.before ? Math.round((1 - st.exposure.after / st.exposure.before) * 100) : 0}%</span></div>
+              <div className="mt-1 h-2.5 rounded-full bg-white/20"><div className="h-full rounded-full bg-emerald-300 transition-all" style={{ width: `${st.exposure.before ? (1 - st.exposure.after / st.exposure.before) * 100 : 0}%` }} /></div></div>
+          </div>
+        </section>
         <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {[["Active subscribers", st.subscribers.filter(x => x.status === "active").length.toString(), ""], ["At risk, not handled", atRisk.toString(), "text-rose-600"], ["Chargebacks prevented", st.saved.preventedChargebacks.toString(), "text-emerald-600"], ["Net loss avoided", money(st.saved.dollarsSaved), "text-emerald-600"], ["Injection attempts blocked", st.injectionBlocks.length.toString(), "text-violet-600"]].map(([k, v, c]) => (
             <div key={k} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-xs font-medium text-slate-500">{k}</div><div className={`mt-1 text-2xl font-semibold tabular-nums ${c}`}>{v}</div></div>
@@ -92,11 +108,20 @@ export default function Home() {
         </div>
         {err && <div className="mt-3 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-700">{err}</div>}
 
-        {tab === "subs" && (
-          <div className="mt-4 h-[620px]">
-            <AgGridReact<Sub> theme={theme} rowData={st.subscribers} columnDefs={cols} getRowId={(p) => p.data.id} onRowClicked={(e) => setOpen(e.data!.id)} rowClass="cursor-pointer" />
+        {tab === "subs" && (<>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <input value={quick} onChange={e => setQuick(e.target.value)} placeholder="Search subscribers, signals, decisions…" className="w-72 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#0b5fff]" />
+            <button onClick={runSelected} disabled={!selected.length} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium disabled:opacity-40">Run agent on selected ({selected.length})</button>
+            <button onClick={() => grid.current?.api.exportDataAsCsv({ fileName: "subguard-subscribers.csv" })} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium">Export CSV</button>
+            <span className="ml-auto text-xs text-slate-400">Click a row for the agent&apos;s reasoning · use column menus to filter</span>
           </div>
-        )}
+          <div className="mt-3 h-[620px]">
+            <AgGridReact<Sub> ref={grid} theme={theme} rowData={st.subscribers} columnDefs={cols} getRowId={(p) => p.data.id} quickFilterText={quick}
+              rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: false }} onSelectionChanged={(e) => setSelected(e.api.getSelectedRows().map(r => r.id))}
+              defaultColDef={{ sortable: true, resizable: true, floatingFilter: false }} onRowClicked={(e) => setOpen(e.data!.id)} rowClass="cursor-pointer"
+              rowClassRules={{ "!bg-rose-50/40": (p) => (p.data?.risk ?? 0) >= 0.6 && !p.data?.decisions.length }} />
+          </div>
+        </>)}
 
         {tab === "disputes" && (
           <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -106,7 +131,7 @@ export default function Home() {
                   {dp.status === "open" ? <button onClick={() => post("/api/dispute", { disputeId: dp.id }, dp.id)} disabled={busy[dp.id]} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40">{busy[dp.id] ? "Thinking…" : "Ask agent"}</button> : <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${dp.status === "contested" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{dp.status}</span>}</div>
                 <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm italic text-slate-600">&ldquo;{dp.buyerNote}&rdquo;</p>
                 <ul className="mt-3 grid grid-cols-2 gap-1 text-xs text-slate-500"><li>Delivered boxes: {dp.facts.deliveredShipments}</li><li>Last login: {dp.facts.lastLoginDaysAgo}d ago</li><li>Tracking delivered: {String(dp.facts.trackingDelivered)}</li><li>Reminder before renewal: {String(dp.facts.reminderSentBeforeRenewal)}</li></ul>
-                {dp.decision && <div className="mt-4 border-t border-slate-100 pt-3 text-sm"><div className="font-medium">{ACTION_LABEL[dp.decision.action]}</div><p className="mt-1 text-slate-600">{dp.decision.reasoning}</p>
+                {dp.decision && <div className="mt-4 border-t border-slate-100 pt-3 text-sm"><div className="font-medium">{ACTION_LABEL[dp.decision.action]}</div>{!!dp.decision.investigation?.length && <div className="mt-1 font-mono text-[11px] text-slate-400">{dp.decision.investigation.map(z => <div key={z} className="truncate">{z}</div>)}</div>}<p className="mt-1 text-slate-600">{dp.decision.reasoning}</p>
                   {!!dp.evidence?.length && <><div className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Evidence pack</div><ul className="mt-1 list-disc pl-5 text-slate-600">{dp.evidence.map(e => <li key={e}>{e}</li>)}</ul></>}
                   <p className="mt-3 text-xs text-slate-400">{dp.decision.guardrails[0]}</p></div>}
               </div>); })}
@@ -119,6 +144,8 @@ export default function Home() {
               <div className="mt-3 max-h-[480px] overflow-auto font-mono text-xs">{st.apiCalls.length ? st.apiCalls.map((c, i) => <div key={i} className="flex gap-2 border-b border-slate-50 py-1.5"><span className={c.ok ? "text-emerald-600" : "text-rose-600"}>{c.status}</span><span className="w-12 text-slate-400">{c.method}</span><span className="flex-1 text-slate-700">{c.path}</span><span className="text-slate-400">{c.summary}</span></div>) : <div className="text-slate-400">No calls yet.</div>}</div></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">Guardrails</h3>
               <ul className="mt-3 space-y-2 text-sm text-slate-600"><li>• Refunds never exceed the original PayPal capture, which is re-fetched before every refund.</li><li>• Daily refund cap of $100; refunds above $30 wait for a human click.</li><li>• Every money-moving call carries a PayPal-Request-Id (idempotent — no double refunds).</li><li>• Customer text is wrapped as untrusted data; injection patterns are detected and logged.</li></ul>
+              <div className="mt-5 flex items-center justify-between"><h4 className="text-sm font-semibold">Live PayPal webhook events</h4><button onClick={loadEvents} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs">Fetch from PayPal</button></div>
+              {events && (events.length ? <div className="mt-2 max-h-48 overflow-auto font-mono text-[11px]">{events.map(e => <div key={e.id} className="flex gap-2 border-b border-slate-50 py-1"><span className="text-emerald-600">{e.type}</span><span className="truncate text-slate-500">{e.summary}</span></div>)}</div> : <p className="mt-2 text-xs text-slate-400">No events yet (PayPal sends them to the deployed URL).</p>)}
               <h4 className="mt-5 text-sm font-semibold">Blocked injection attempts</h4>{st.injectionBlocks.length ? st.injectionBlocks.map((b, i) => <div key={i} className="mt-2 rounded-lg bg-violet-50 px-3 py-2 text-xs text-violet-800">{st.subscribers.find(s => s.id === b.subscriberId)?.name}: &ldquo;{b.excerpt}…&rdquo;</div>) : <p className="mt-2 text-xs text-slate-400">None yet.</p>}</div>
           </div>
         )}
@@ -134,6 +161,7 @@ export default function Home() {
             {sel.decisions.map((d, i) => (
               <div key={i} className="mt-5 rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between"><span className="font-semibold">{ACTION_LABEL[d.action]}</span><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${STATUS_TONE[d.status]}`}>{d.status.replace("_", " ")}</span></div>
+                {!!d.investigation?.length && <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500"><div className="mb-1 font-semibold text-slate-600">Agent checked PayPal first</div>{d.investigation.map(z => <div key={z} className="truncate font-mono">{z}</div>)}</div>}
                 <p className="mt-2 text-sm text-slate-600">{d.reasoning}</p>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs"><div className="rounded-lg bg-slate-50 p-2"><div className="text-slate-400">Chargeback risk</div><div className="text-base font-semibold">{Math.round(d.chargebackRisk * 100)}%</div></div><div className="rounded-lg bg-slate-50 p-2"><div className="text-slate-400">Loss if nothing</div><div className="text-base font-semibold">{money(d.expectedLoss)}</div></div><div className="rounded-lg bg-slate-50 p-2"><div className="text-slate-400">Action cost</div><div className="text-base font-semibold">{money(d.actionCost)}</div></div></div>
                 {d.message && <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900"><span className="text-xs font-semibold">Message to customer: </span>{d.message}</div>}
