@@ -1,21 +1,22 @@
 {
   "productId": "PROD-6MJ45241HK614344L",
   "planIds": {
-    "Basic": "P-1Y361375GL0277145NLFUTSQ",
-    "Pro": "P-82J36797UM366543TNLFUTSY"
+    "Basic": "P-6TW45377RB122625CNLFVPGI",
+    "Pro": "P-0YV22516YC692214YNLFVPGY"
   },
+  "planCycle": "DAY",
   "subscribers": {
     "sub_01": {
-      "subscriptionId": "I-DLC381JM5M16",
+      "subscriptionId": "I-PUCYJHC7HM86",
       "subscriptionStatus": "ACTIVE"
     },
     "sub_02": {
-      "orderId": "1H207978X5447950M",
-      "captureId": "49U75431G1385293W",
-      "chargeAmount": 12
+      "orderId": "5B5329723G9966148",
+      "chargeAmount": 12,
+      "captureId": "46E8008663683102D"
     },
     "sub_04": {
-      "subscriptionId": "I-U7FM2CM062KN",
+      "subscriptionId": "I-RCE1Y17TNN9M",
       "subscriptionStatus": "ACTIVE"
     },
     "sub_05": {

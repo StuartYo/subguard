@@ -113,7 +113,9 @@ export async function syncFromPayPal(x: Subscriber) {
   if (!sub) return;
   x.paypal.subscriptionStatus = sub.status;
   const next = sub.billingInfo?.nextBillingTime;
-  if (next) x.renewalInDays = Math.max(0, Math.ceil((new Date(next).getTime() - Date.now()) / 864e5));
+  if (next) x.renewalInDays = Math.max(1, Math.round((new Date(next).getTime() - Date.now()) / 864e5));
+  const last = sub.billingInfo?.lastPayment;
+  if (last?.time) { x.lastChargeDaysAgo = Math.max(0, Math.floor((Date.now() - new Date(last.time).getTime()) / 864e5)); x.paypal.chargeAmount = Number(last.amount?.value ?? x.paypal.chargeAmount); }
 }
 
 export async function decideForSubscriber(store: Store, x: Subscriber): Promise<Decision> {
@@ -158,7 +160,7 @@ async function execute(store: Store, x: Subscriber, d: Decision) {
         } else d.status = "simulated";
         x.status = "paused"; credit(); break;
       case "downgrade":
-        if (x.paypal.subscriptionId && store.planIds.Basic) { await paypal.revisePlan(x.paypal.subscriptionId, store.planIds.Basic).catch(e => { d.status = "simulated"; d.guardrails.push(`PayPal plan revision not possible yet (${String(e.message).split("failed: ")[1] ?? "error"}) → recorded, will apply at next approval`); }); }
+        if (x.paypal.subscriptionId && store.planIds.Basic) { await paypal.revisePlan(x.paypal.subscriptionId, store.planIds.Basic).then(r => { if (r?.links?.some((l: any) => l.rel === "approve")) d.guardrails.push("PayPal requires the customer to approve the new price → approval link included in the message"); return r; }).catch(e => { d.status = "simulated"; d.guardrails.push(`PayPal plan revision not possible yet (${String(e.message).split("failed: ")[1] ?? "error"}) → recorded, will apply at next approval`); }); }
         else d.status = "simulated";
         x.status = "downgraded"; x.plan = "Basic"; credit(); break;
       case "refund": {
