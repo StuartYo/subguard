@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { load, save, PRICE } from "@/lib/store";
 import * as paypal from "@/lib/paypal";
+import * as sdk from "@/lib/paypal-sdk";
 
 const ORDERS = [{ sub: "sub_02", label: "Daniel – renewal charged yesterday" }, { sub: "sub_05", label: "Omar – last renewal (injection case)" }];
 const SUBS = [{ sub: "sub_01", label: "Mia – Pro subscription (pause case)" }, { sub: "sub_04", label: "Lena – Pro subscription (downgrade case)" }];
@@ -12,18 +13,20 @@ export async function POST(req: Request) {
   const s = load();
   try {
     if (!s.productId) s.productId = (await paypal.createProduct("Brewlab Coffee Subscription")).id;
+    // Sandbox plans bill daily so "renews tomorrow" is real whenever a judge opens the demo.
+    if (s.planCycle !== "DAY") { s.planIds = {}; s.planCycle = "DAY"; }
     for (const p of ["Basic", "Pro"] as const) if (!s.planIds[p]) s.planIds[p] = (await paypal.createPlan(s.productId!, `Brewlab ${p}`, PRICE[p].toFixed(2))).id;
     const links: { label: string; url: string }[] = [];
     for (const o of ORDERS) {
       const x = s.subscribers.find(z => z.id === o.sub)!;
-      if (x.paypal.captureId) continue;
+      if (x.paypal.captureId) { const c: any = await sdk.getCapture(x.paypal.captureId).catch(() => null); if (c?.status === "COMPLETED") continue; x.paypal.captureId = undefined; x.paypal.refunded = false; }
       const ord = await paypal.createRenewalOrder(PRICE[x.plan].toFixed(2), `Brewlab ${x.plan} monthly renewal`, x.id, `${origin}/api/paypal/return?kind=order&sub=${x.id}`, `${origin}/setup`);
       x.paypal.orderId = ord.id;
       links.push({ label: o.label, url: ord.links.find((l: any) => l.rel === "payer-action" || l.rel === "approve").href });
     }
     for (const o of SUBS) {
       const x = s.subscribers.find(z => z.id === o.sub)!;
-      if (x.paypal.subscriptionStatus === "ACTIVE") continue;
+      if (x.paypal.subscriptionId) { const cur: any = await sdk.getSubscription(x.paypal.subscriptionId).catch(() => null); if (cur && cur.planId === s.planIds[x.plan] && ["ACTIVE", "SUSPENDED"].includes(cur.status)) continue; }
       const sub = await paypal.createSubscription(s.planIds[x.plan]!, `${origin}/api/paypal/return?kind=sub&sub=${x.id}`, `${origin}/setup`, x.id);
       x.paypal.subscriptionId = sub.id; x.paypal.subscriptionStatus = sub.status;
       links.push({ label: o.label, url: sub.links.find((l: any) => l.rel === "approve").href });

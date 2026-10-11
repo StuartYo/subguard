@@ -1,7 +1,10 @@
 // The SubGuard agent: Claude decides, a guarded executor moves money through PayPal.
 import Anthropic from "@anthropic-ai/sdk";
 import { CHARGEBACK_FEE, Decision, Dispute, PRICE, Store, Subscriber, riskScore } from "./store";
-import * as paypal from "./paypal";
+import * as rest from "./paypal";
+import * as sdk from "./paypal-sdk";
+// Money-moving + verification calls go through the PayPal Server SDK; disputes stay on REST (not in the SDK).
+const paypal = { ...rest, ...sdk };
 
 const MODEL = process.env.SUBGUARD_MODEL ?? "claude-sonnet-5-5";
 const REFUND_DAILY_CAP = 100;      // USD per day across all customers
@@ -60,12 +63,14 @@ const ai = () => (client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_K
 const READ_TOOLS: Anthropic.Tool[] = [
   { name: "get_paypal_subscription", description: "Fetch the live PayPal subscription (status, plan, next billing time, last payment).", input_schema: { type: "object", properties: { subscription_id: { type: "string" } }, required: ["subscription_id"] } },
   { name: "get_paypal_capture", description: "Fetch a PayPal payment capture (amount, status, refunds) to verify a charge before deciding on a refund.", input_schema: { type: "object", properties: { capture_id: { type: "string" } }, required: ["capture_id"] } },
+  { name: "list_subscription_transactions", description: "List the subscription's recent PayPal billing transactions (last 90 days).", input_schema: { type: "object", properties: { subscription_id: { type: "string" } }, required: ["subscription_id"] } },
   { name: "list_paypal_disputes", description: "List open disputes on the merchant's PayPal account.", input_schema: { type: "object", properties: {} } },
 ];
 async function runReadTool(name: string, input: any) {
   try {
-    if (name === "get_paypal_subscription") { const r = await paypal.getSubscription(input.subscription_id); return { status: r.status, plan_id: r.plan_id, next_billing_time: r.billing_info?.next_billing_time, last_payment: r.billing_info?.last_payment }; }
-    if (name === "get_paypal_capture") { const r = await paypal.getCapture(input.capture_id); return { status: r.status, amount: r.amount, create_time: r.create_time }; }
+    if (name === "get_paypal_subscription") { const r: any = await paypal.getSubscription(input.subscription_id); return { status: r.status, plan_id: r.planId, next_billing_time: r.billingInfo?.nextBillingTime, last_payment: r.billingInfo?.lastPayment }; }
+    if (name === "get_paypal_capture") { const r: any = await paypal.getCapture(input.capture_id); return { status: r.status, amount: r.amount, create_time: r.createTime }; }
+    if (name === "list_subscription_transactions") { const r: any = await paypal.listSubscriptionTransactions(input.subscription_id); return { transactions: (r.transactions ?? []).slice(0, 5).map((t: any) => ({ status: t.status, time: t.time, amount: t.amountWithBreakdown?.grossAmount?.value })) }; }
     if (name === "list_paypal_disputes") { const r = await paypal.listDisputes(); return { open_disputes: r.items?.length ?? 0 }; }
   } catch (e: any) { return { error: String(e.message).slice(0, 160) }; }
   return { error: "unknown tool" };
@@ -102,7 +107,17 @@ function profile(x: Subscriber) {
   ].join("\n");
 }
 
+export async function syncFromPayPal(x: Subscriber) {
+  if (!x.paypal.subscriptionId) return;
+  const sub: any = await paypal.getSubscription(x.paypal.subscriptionId).catch(() => null);
+  if (!sub) return;
+  x.paypal.subscriptionStatus = sub.status;
+  const next = sub.billingInfo?.nextBillingTime;
+  if (next) x.renewalInDays = Math.max(0, Math.ceil((new Date(next).getTime() - Date.now()) / 864e5));
+}
+
 export async function decideForSubscriber(store: Store, x: Subscriber): Promise<Decision> {
+  await syncFromPayPal(x);
   const guardrails: string[] = [];
   const injected = !!x.supportMessage && INJECTION.test(x.supportMessage);
   if (injected) {
@@ -136,7 +151,7 @@ async function execute(store: Store, x: Subscriber, d: Decision) {
         credit(); break;
       case "pause":
         if (x.paypal.subscriptionId) {
-          const sub = await paypal.getSubscription(x.paypal.subscriptionId);
+          const sub: any = await paypal.getSubscription(x.paypal.subscriptionId);
           d.guardrails.push(`Verified subscription state in PayPal: ${sub.status}`);
           if (sub.status === "ACTIVE") { await paypal.suspendSubscription(x.paypal.subscriptionId, "Paused by SubGuard on customer's behalf to avoid an unwanted renewal"); x.paypal.subscriptionStatus = "SUSPENDED"; }
           else d.status = "simulated";
@@ -150,7 +165,7 @@ async function execute(store: Store, x: Subscriber, d: Decision) {
         const cap = x.paypal.captureId;
         if (!cap) { d.status = "simulated"; d.guardrails.push("No sandbox capture on file → refund simulated"); x.status = "refunded"; credit(); break; }
         if (x.paypal.refunded) { d.status = "blocked"; d.guardrails.push("Already refunded once → blocked (idempotency)"); break; }
-        const original = await paypal.getCapture(cap);
+        const original: any = await paypal.getCapture(cap);
         if (original.status !== "COMPLETED") { d.status = "blocked"; d.guardrails.push(`Original capture is ${original.status} in PayPal → no second refund`); x.paypal.refunded = true; x.status = "refunded"; break; }
         const amount = Math.min(Number(original.amount.value), d.actionCost || Number(original.amount.value));
         d.guardrails.push(`Re-verified original capture in PayPal: $${original.amount.value} ${original.status}`);

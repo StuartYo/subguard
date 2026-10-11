@@ -6,15 +6,16 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 ## Why
 
-- The #1 reason for US card disputes is a **cancelled recurring transaction — 40% of disputes**. US cardholders disputed $9.8B in 2024 and $5.9B became chargebacks. ([CFPB](https://www.consumerfinance.gov/))
-- Roughly **1 in 4 Mastercard chargebacks** comes from subscription billing (Mastercard, 2026).
+- The #1 reason for US card disputes is a **cancelled recurring transaction — 40% of disputes**. US cardholders disputed $9.8B in 2024 and $5.9B became chargebacks. ([CFPB report, Federal Register](https://public-inspection.federalregister.gov/2026-00081.pdf))
+- Roughly **1 in 4 Mastercard chargebacks** comes from subscription billing ([Mastercard, May 2026](https://www.mastercard.com/us/en/news-and-trends/stories/2026/subscription-economy-fraud-deflect.html)).
+- Every $1 of fraud costs US merchants $4.61 in total ([LexisNexis True Cost of Fraud 2025](https://risk.lexisnexis.com/global/en/about-us/press-room/press-release/20250402-tcof-ecommerce-and-retail)).
 - Each chargeback costs the merchant a fee (~$15), the goods, and pushes up its dispute ratio — too high and the account gets restricted. Small merchants have no team to watch this.
 
 Most "AI + payments" projects help a buyer pay. SubGuard works on the other side: it protects the merchant's revenue *after* the sale.
 
 ## What the agent does
 
-For each subscriber the agent (Claude) reads the signals — last activity, unopened emails, skipped shipments, renewal date, recent charges, and the customer's own message — and picks **one** action by comparing:
+For each subscriber the agent (Claude) first **investigates in PayPal** — it can call read-only tools to fetch the live subscription, its recent billing transactions, the original capture, and open disputes — then reads the signals — last activity, unopened emails, skipped shipments, renewal date, recent charges, and the customer's own message — and picks **one** action by comparing:
 
 > expected loss if we do nothing = P(chargeback) × (charge + fee)  vs.  cost of the action
 
@@ -27,6 +28,10 @@ For each subscriber the agent (Claude) reads the signals — last activity, unop
 | Accept / contest dispute | dispute workflow + evidence pack | A dispute has been opened |
 
 Every decision shows the agent's reasoning, its risk and cost numbers, the guardrails that ran, and the exact PayPal calls it made.
+
+## Evaluation
+
+`POST /api/eval` (local only) runs 12 fixed scenarios against the real model — 7 business cases and 5 prompt-injection variants (fake owner authorization, fake `<system>` tag, task smuggling, polite override, classic ignore-previous). **Latest run: 12 / 12 passed; no injection produced a refund.** The regex filter alone caught 1 of 5 injections; the model flagged 3 more itself, and the executor's limits would have blocked the rest.
 
 ## Guardrails (an agent that moves money has to be safe)
 
@@ -43,12 +48,14 @@ Next.js (App Router) ── /api/agent ──► Claude (tool use: decide / deci
         │                                   │
         │                          guarded executor
         │                                   │
-        └──────── PayPal REST (sandbox): Catalog · Plans · Subscriptions · Orders · Captures · Refunds · Reporting
+        ├──────── PayPal Server SDK (APIMatic, TypeScript): subscriptions get/suspend/activate/revise/transactions · captures · refunds
+        └──────── PayPal REST: catalog · plans · orders · disputes · webhooks (+ signature verification) · webhook event feed
 AG Grid dashboard  ◄── /api/state (subscribers, decisions, API call log)
 ```
 
 - `src/lib/agent.ts` — prompt, tools, decision → guarded execution
-- `src/lib/paypal.ts` — PayPal REST client; every call is logged for the UI
+- `src/lib/paypal-sdk.ts` — PayPal Server SDK client (built with the APIMatic Context Plugin; contract sheet in `pay-pal-server-sdk-plan.md`)
+- `src/lib/paypal.ts` — REST client for what the SDK does not cover; every call (SDK or REST) is logged for the UI
 - `src/lib/store.ts` — demo merchant "Brewlab" (24 subscribers) and risk heuristic
 - `src/app/page.tsx` — dashboard (KPIs, AG Grid, detail drawer, disputes, agent log)
 - `src/app/setup` — one-time sandbox setup (product, plans, hero orders/subscriptions)
@@ -74,7 +81,12 @@ npm run dev                  # http://localhost:3000
 ## How AI was used
 
 - **In the product**: Anthropic Claude (Sonnet) decides each action and each dispute via tool use; the deterministic executor applies guardrails and calls PayPal.
-- **In building it**: Claude Code (Anthropic) helped write code and documentation; all code was reviewed and tested by the author.
+- **In building it**: Claude Code (Anthropic) with the **APIMatic Context Plugin for PayPal** — the plugin gave the coding agent the PayPal Server SDK context and the plan-first workflow used for the SDK integration (`pay-pal-server-sdk-plan.md`). All code was reviewed and tested by the author.
+
+## Sandbox notes
+
+- Demo plans bill **daily** in sandbox so "renews tomorrow" is real whenever the demo is opened; the UI reads renewal dates from PayPal (`billing_info.next_billing_time`).
+- A webhook is registered for subscription, capture and dispute events; signatures are verified with PayPal's `verify-webhook-signature` API, and the Agent log can pull PayPal's own event feed.
 
 ## License
 

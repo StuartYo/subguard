@@ -5,6 +5,7 @@ const BASE = process.env.PAYPAL_ENV === "live" ? "https://api-m.paypal.com" : "h
 export type ApiCall = { at: string; method: string; path: string; status: number; ok: boolean; summary: string };
 const calls: ApiCall[] = [];
 export const apiCalls = () => calls.slice(-200);
+export const logCall = (method: string, path: string, status: number, summary: string) => calls.push({ at: new Date().toISOString(), method, path, status, ok: status < 400, summary });
 
 let token: { value: string; exp: number } | null = null;
 async function accessToken() {
@@ -43,9 +44,9 @@ export const createProduct = (name: string) =>
 export const createPlan = (productId: string, name: string, price: string) =>
   pp("POST", "/v1/billing/plans", {
     product_id: productId, name, status: "ACTIVE",
-    billing_cycles: [{ frequency: { interval_unit: "MONTH", interval_count: 1 }, tenure_type: "REGULAR", sequence: 1, total_cycles: 0, pricing_scheme: { fixed_price: { value: price, currency_code: "USD" } } }],
+    billing_cycles: [{ frequency: { interval_unit: "DAY", interval_count: 1 }, tenure_type: "REGULAR", sequence: 1, total_cycles: 0, pricing_scheme: { fixed_price: { value: price, currency_code: "USD" } } }],
     payment_preferences: { auto_bill_outstanding: true, payment_failure_threshold: 2 },
-  }, { summary: `create plan ${name} $${price}/mo` });
+  }, { summary: `create plan ${name} $${price} (sandbox: bills daily)` });
 
 // ── Subscriptions ──
 export const createSubscription = (planId: string, returnUrl: string, cancelUrl: string, customId: string) =>
