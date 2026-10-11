@@ -79,7 +79,7 @@ npm run dev                  # http://localhost:3000
 
 ## Honest limitations
 
-- PayPal sandbox cannot open a real dispute from a merchant app, so dispute events are simulated using PayPal's webhook payload shape and are labeled as simulated in the UI.
+- Disputes are real sandbox disputes opened by a sandbox buyer in PayPal's Resolution Center; **Sync disputes from PayPal** pulls them through the Disputes API and the agent accepts or submits evidence on them. If no real dispute exists yet (fresh setup), a simulated one in PayPal's payload shape is shown and labeled *simulated*.
 - Actions on subscribers without a sandbox object (most of the 24 demo rows) are recorded as *simulated*; the hero cases use real sandbox subscriptions and captures.
 - Demo state lives in a JSON file (local) or `/tmp` (Vercel), which is enough for a demo, not production.
 
