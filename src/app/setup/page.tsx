@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function Setup() {
   const [res, setRes] = useState<{ links?: { label: string; url: string }[]; error?: string; planIds?: Record<string, string> } | null>(null);
   const [busy, setBusy] = useState(false);
-  const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const [q, setQ] = useState<URLSearchParams | null>(null);
+  useEffect(() => { const id = setTimeout(() => setQ(new URLSearchParams(window.location.search)), 0); return () => clearTimeout(id); }, []);
   const run = async () => { setBusy(true); setRes(await (await fetch("/api/setup", { method: "POST" })).json()); setBusy(false); };
   return (
     <main className="mx-auto max-w-2xl px-6 py-12 text-slate-800">

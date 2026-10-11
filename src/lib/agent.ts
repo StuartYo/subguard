@@ -123,6 +123,7 @@ async function execute(store: Store, x: Subscriber, d: Decision) {
         if (!cap) { d.status = "simulated"; d.guardrails.push("No sandbox capture on file → refund simulated"); x.status = "refunded"; credit(); break; }
         if (x.paypal.refunded) { d.status = "blocked"; d.guardrails.push("Already refunded once → blocked (idempotency)"); break; }
         const original = await paypal.getCapture(cap);
+        if (original.status !== "COMPLETED") { d.status = "blocked"; d.guardrails.push(`Original capture is ${original.status} in PayPal → no second refund`); x.paypal.refunded = true; x.status = "refunded"; break; }
         const amount = Math.min(Number(original.amount.value), d.actionCost || Number(original.amount.value));
         d.guardrails.push(`Re-verified original capture in PayPal: $${original.amount.value} ${original.status}`);
         d.guardrails.push(`Refund $${amount} ≤ original charge ✓`);
