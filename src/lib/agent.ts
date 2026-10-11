@@ -103,6 +103,7 @@ function profile(x: Subscriber) {
     `Next renewal in ${x.renewalInDays} days.${x.paypal.subscriptionId ? ` PayPal subscription ${x.paypal.subscriptionId}.` : ""}`,
     x.lastChargeDaysAgo !== null ? `Latest charge: $${charge} captured ${x.lastChargeDaysAgo} day(s) ago${x.paypal.captureId ? ` (PayPal capture ${x.paypal.captureId})` : ""}.` : "No charge in the last 3 days.",
     `Heuristic risk score: ${riskScore(x)}`,
+    x.paypal.subscriptionId ? "Sandbox note: this PayPal sandbox subscription was created recently and sandbox demo plans bill daily, so PayPal shows a shorter transaction history and a sooner next charge than the merchant tenure above. That is expected, not a billing error." : "",
     x.supportMessage ? `<customer_message>${x.supportMessage}</customer_message>` : "No recent customer message.",
   ].join("\n");
 }
