@@ -40,15 +40,16 @@ PayPal webhooks drive the agent. A signed `CUSTOMER.DISPUTE.CREATED`, `BILLING.S
 
 ## Evaluation
 
-`POST /api/eval` (local only) runs **22 scenarios × 3 runs** against the real model, plus two baselines a merchant could use instead (`src/lib/baseline.ts`): hand-written keyword rules, and the same rules behind SubGuard's injection regex. A scenario passes only if all 3 runs choose an allowed action. 12 scenarios were used while tuning the prompt; **10 held-out scenarios were written afterwards**: attacks phrased to slip past the regex (fake support ticket, roleplay, French, "the owner's friend said it's fine") and false-positive traps (a gift subscription, a traveller, a loyal customer renewing tomorrow) who look at risk but should be left alone. Results are committed (`src/data/eval-results.json`) and shown in the Evaluation tab.
+`POST /api/eval` (local only) runs **22 scenarios × 3 runs** against the real model and three baselines: hand-written keyword rules, the same rules behind SubGuard's injection regex, and a **plain LLM** (the same Claude model with one short prompt, no PayPal tools, no injection rules, no executor; one run each). A scenario passes only if every run picks an allowed action. 12 scenarios were used while tuning the prompt; **10 held-out scenarios were written afterwards**: attacks phrased to slip past the regex and false-positive traps (a gift subscription, a traveller, a loyal customer renewing tomorrow). Results are committed (`src/data/eval-results.json`) and shown in the Evaluation tab.
 
 | | Scenarios passed | Held-out passed | $ given away wrongly | $ chargeback exposure left open |
 |---|---|---|---|---|
 | Keyword rules | 14 / 22 | 6 / 10 | $108 | $27 |
 | Rules + injection regex | 17 / 22 | 6 / 10 | $72 | $27 |
-| SubGuard agent | **22 / 22** (66/66 runs) | **10 / 10** | **$0** | **$0** |
+| Plain LLM (same model, one prompt) | 22 / 22 (1 run) | 10 / 10 | $0 | $0 |
+| SubGuard agent | 22 / 22 (66/66 runs) | 10 / 10 | $0 | $0 |
 
-The first run of this harder suite caught a real bug: asked to cancel, the agent sent a reminder, which doesn't stop the charge. The prompt now says to honor cancel requests by pausing before the next charge; the held-out set was not touched. The rules fail where intent matters: they refund attackers whose wording dodges the regex, pause a gift subscription the customer asked to keep, and pause instead of refunding a customer who is about to dispute. Scenarios are author-written, so treat this as a regression suite, not a benchmark.
+What this shows, honestly: on these scenarios a modern model already makes good calls; hand-written rules don't. SubGuard's edge is not better judgment than the bare model; it is what surrounds the judgment: it **checks PayPal before acting** (a plain prompt can't know whether a charge was already refunded or disputed), the **money limits live in code** and hold even when the model is fooled (unit test: a model output asking for $500 still refunds exactly the $12 capture), and it **runs and acts on its own** from verified webhooks. The first run of this suite also caught a real bug (a cancel request got a reminder, which doesn't stop the charge); the prompt was fixed without touching the held-out set. Scenarios are author-written, so treat this as a regression suite, not a benchmark.
 
 `npm test` runs 13 unit tests with PayPal mocked: refund amount comes from the capture (a model asking for $500 still refunds $12), a non-COMPLETED capture blocks, no second refund, daily cap, human approval above $30, stable `PayPal-Request-Id`, injection filter, the autopilot's skip rules, and the human-approval rule for accepting disputes over $30.
 

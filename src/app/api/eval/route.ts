@@ -1,9 +1,11 @@
-// Offline evaluation: 12 tuning scenarios + 10 held-out ones, each run 3x against the real model, plus two rule baselines.
+// Offline evaluation: 12 tuning scenarios + 10 held-out ones, each run 3x against the real model, plus two rule baselines
+// and a plain-LLM baseline (same model, one prompt, no tools, no executor). POST ?only=plain re-runs just that baseline.
 // Scenarios carry no PayPal IDs, so nothing real is executed; results are not saved to the demo store.
 import { NextResponse } from "next/server";
 import { decideForSubscriber } from "@/lib/agent";
 import type { Store, Subscriber } from "@/lib/store";
 import { rulesPolicy, rulesWithFilter } from "@/lib/baseline";
+import { plainLLM } from "@/lib/plainllm";
 import fs from "fs";
 import path from "path";
 
@@ -46,8 +48,22 @@ const dollars = (c: Case, a: string, cost: number) => ({
   exposureLeft: c.allowed.includes("refund") && a !== "refund" ? charge(c.sub) + 15 : 0,
 });
 
-export async function POST() {
+async function plainBaseline() {
+  const rows = await Promise.all(CASES.map(async c => { const r = await plainLLM(c.sub); return { case: c.name, plain: `${r.action} ($${r.cost})`, plainPass: ok(c, r.action, r.cost), plainDollars: dollars(c, r.action, r.cost) }; }));
+  return { rows, passed: rows.filter(r => r.plainPass).length, held: rows.filter(r => r.case.startsWith("Held-out") && r.plainPass).length,
+    dollars: { givenAway: rows.reduce((t, r) => t + r.plainDollars.givenAway, 0), exposureLeft: rows.reduce((t, r) => t + r.plainDollars.exposureLeft, 0) } };
+}
+
+export async function POST(req: Request) {
   if (process.env.VERCEL) return NextResponse.json({ error: "Run the eval locally." }, { status: 403 });
+  const file = path.join(process.cwd(), "src", "data", "eval-results.json");
+  if (new URL(req.url).searchParams.get("only") === "plain") {
+    const out = JSON.parse(fs.readFileSync(file, "utf8")); const pb = await plainBaseline();
+    for (const r of out.rows) Object.assign(r, pb.rows.find(x => x.case === r.case));
+    out.plainPassed = pb.passed; out.heldOut.plain = pb.held; out.dollars.plain = pb.dollars; out.plainRanAt = new Date().toISOString();
+    fs.writeFileSync(file, JSON.stringify(out, null, 2));
+    return NextResponse.json({ plainPassed: pb.passed, held: pb.held, dollars: pb.dollars, rows: pb.rows.map(r => `${r.plainPass ? "ok" : "xx"} ${r.case} | ${r.plain}`) });
+  }
   const store: Store = { merchant: "eval", planIds: {}, subscribers: [], disputes: [], saved: { preventedChargebacks: 0, dollarsSaved: 0, refundsIssued: 0 }, refundsToday: 0, injectionBlocks: [] };
   const rows = await Promise.all(CASES.map(async c => {
     const rule = rulesPolicy(c.sub), ruleF = rulesWithFilter(c.sub);

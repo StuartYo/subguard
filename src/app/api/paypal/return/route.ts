@@ -10,7 +10,7 @@ export async function GET(req: Request) {
       const orderId = u.searchParams.get("token") ?? x.paypal.orderId!;
       const r = await paypal.captureOrder(orderId);
       const cap = r.purchase_units[0].payments.captures[0];
-      x.paypal.captureId = cap.id; x.paypal.chargeAmount = Number(cap.amount.value); x.lastChargeDaysAgo = x.lastChargeDaysAgo ?? 1;
+      x.paypal.captureId = cap.id; x.paypal.chargeAmount = Number(cap.amount.value); x.paypal.refunded = false; x.lastChargeDaysAgo = x.lastChargeDaysAgo ?? 1;
     } else {
       const id = u.searchParams.get("subscription_id") ?? x.paypal.subscriptionId!;
       const sub = await paypal.getSubscription(id);

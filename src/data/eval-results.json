@@ -10,7 +10,8 @@
     "total": 10,
     "passed": 10,
     "rules": 6,
-    "rulesFiltered": 6
+    "rulesFiltered": 6,
+    "plain": 10
   },
   "dollars": {
     "agent": {
@@ -24,6 +25,10 @@
     "rulesFiltered": {
       "givenAway": 72,
       "exposureLeft": 27
+    },
+    "plain": {
+      "givenAway": 0,
+      "exposureLeft": 0
     }
   },
   "rows": [
@@ -53,6 +58,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "pause ($24)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -81,6 +92,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "refund ($12)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -109,6 +126,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -137,6 +160,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "downgrade ($12)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -165,6 +194,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "escalate ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -193,6 +228,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "escalate ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -221,6 +262,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -249,6 +296,12 @@
           "givenAway": 12,
           "exposureLeft": 0
         }
+      },
+      "plain": "escalate ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -277,6 +330,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -305,6 +364,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -333,6 +398,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -361,6 +432,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "remind ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -389,6 +466,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -417,6 +500,12 @@
           "givenAway": 12,
           "exposureLeft": 0
         }
+      },
+      "plain": "escalate ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -445,6 +534,12 @@
           "givenAway": 12,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -473,6 +568,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -501,6 +602,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -529,6 +636,12 @@
           "givenAway": 12,
           "exposureLeft": 27
         }
+      },
+      "plain": "refund ($12)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -557,6 +670,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -585,6 +704,12 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -613,6 +738,12 @@
           "givenAway": 24,
           "exposureLeft": 0
         }
+      },
+      "plain": "no_action ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     },
     {
@@ -641,7 +772,15 @@
           "givenAway": 0,
           "exposureLeft": 0
         }
+      },
+      "plain": "escalate ($0)",
+      "plainPass": true,
+      "plainDollars": {
+        "givenAway": 0,
+        "exposureLeft": 0
       }
     }
-  ]
+  ],
+  "plainPassed": 22,
+  "plainRanAt": "2026-10-11T12:51:15.945Z"
 }

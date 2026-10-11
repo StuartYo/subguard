@@ -55,7 +55,7 @@ export type Store = {
 const FIRST = ["Mia", "Daniel", "Priya", "Lena", "Omar", "Sofia", "Kenji", "Ava", "Lucas", "Hana", "Noah", "Zoe", "Mateo", "Iris", "Ethan", "Yuna", "Leo", "Chloe", "Ravi", "Emma", "Jonas", "Aiko", "Sam", "Nora"];
 const LAST = ["Chen", "Ortiz", "Nair", "Fischer", "Haddad", "Rossi", "Sato", "Kim", "Silva", "Park", "Brown", "Wu", "Garcia", "Novak", "Wright", "Lee", "Moreau", "Dubois", "Patel", "Clark", "Berg", "Mori", "Taylor", "Kaur"];
 
-function seed(): Store {
+function seed(fresh = false): Store {
   let s = 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   const subs: Subscriber[] = FIRST.map((f, i) => ({
     id: `sub_${String(i + 1).padStart(2, "0")}`, name: `${f} ${LAST[i]}`, email: `${f.toLowerCase()}.${LAST[i].toLowerCase()}@example.com`,
@@ -92,6 +92,7 @@ function seed(): Store {
     saved: { preventedChargebacks: 0, dollarsSaved: 0, refundsIssued: 0 }, refundsToday: 0, injectionBlocks: [],
   };
   // Real disputes the agent already decided (see live-record.json) replace the simulated ones, so every visitor sees them.
+  if (fresh) return st;   // a clean replay, without the recorded sandbox run
   const live = LIVE as unknown as { disputes: Dispute[]; autopilot: Store["autopilot"]; subscribers: Record<string, Pick<Subscriber, "status" | "decisions">>; saved: Store["saved"]; injectionBlocks: Store["injectionBlocks"] };
   for (const dp of live.disputes) st.disputes = [dp, ...st.disputes.filter(d => d.subscriberId !== dp.subscriberId)];
   for (const x of st.subscribers) if (live.subscribers[x.id]) Object.assign(x, live.subscribers[x.id]);
@@ -107,7 +108,7 @@ export function load(): Store {
   return mem!;
 }
 export function save(s: Store) { mem = s; try { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(s, null, 2)); } catch {} }
-export function reset() { const keep = load(); const s = seed(); s.productId = keep.productId; s.planIds = keep.planIds; s.planCycle = keep.planCycle; s.subscribers.forEach((x, i) => (x.paypal = keep.subscribers[i]?.paypal ?? {})); s.refundsToday = keep.refundsToday; s.refundDay = keep.refundDay; s.autopilot = keep.autopilot; /* the daily cap and the webhook history survive a demo reset */ save(s); return s; }
+export function reset(fresh = false) { const keep = load(); const s = seed(fresh); s.productId = keep.productId; s.planIds = keep.planIds; s.planCycle = keep.planCycle; s.subscribers.forEach((x, i) => (x.paypal = keep.subscribers[i]?.paypal ?? {})); s.refundsToday = keep.refundsToday; s.refundDay = keep.refundDay; s.autopilot = keep.autopilot; /* the daily cap and the webhook history survive a demo reset */ save(s); return s; }
 
 // Simple, explainable risk score shown in the grid (the agent makes the actual call).
 export function riskScore(x: Subscriber) {
