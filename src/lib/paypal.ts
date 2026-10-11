@@ -74,9 +74,9 @@ export const getDispute = (id: string) => pp("GET", `/v1/customer/disputes/${id}
 export const acceptClaim = (id: string, note: string) => pp("POST", `/v1/customer/disputes/${id}/accept-claim`, { note: note.slice(0, 2000) }, { requestId: `accept-${id}`, summary: "accept dispute claim" });
 export const sendDisputeMessage = (id: string, message: string) => pp("POST", `/v1/customer/disputes/${id}/send-message`, { message: message.slice(0, 2000) }, { requestId: `msg-${id}-${message.length}`, summary: "send evidence message" });
 // provide-evidence is multipart: an "input" JSON part (documents optional for notes-only evidence)
-export async function provideEvidence(id: string, notes: string, evidenceType = "PROOF_OF_FULFILLMENT") {
+export async function provideEvidence(id: string, notes: string, tracking?: { carrier: string; number: string }, evidenceType = "PROOF_OF_FULFILLMENT") {
   const form = new FormData();
-  form.append("input", new Blob([JSON.stringify({ evidences: [{ evidence_type: evidenceType, notes: notes.slice(0, 2000) }] })], { type: "application/json" }));
+  form.append("input", new Blob([JSON.stringify({ evidences: [{ evidence_type: evidenceType, notes: notes.slice(0, 2000), ...(tracking ? { evidence_info: { tracking_info: [{ carrier_name: tracking.carrier, tracking_number: tracking.number }] } } : {}) }] })], { type: "application/json" }));
   const res = await fetch(`${BASE}/v1/customer/disputes/${id}/provide-evidence`, { method: "POST", headers: { Authorization: `Bearer ${await accessToken()}` }, body: form });
   calls.push({ at: new Date().toISOString(), method: "POST", path: `/v1/customer/disputes/${id}/provide-evidence`, status: res.status, ok: res.ok, summary: "submit evidence" });
   if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(`PayPal provide-evidence failed: ${j?.details?.[0]?.issue ?? j?.name ?? res.status}`); }

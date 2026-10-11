@@ -235,7 +235,8 @@ export async function decideDispute(store: Store, dp: Dispute): Promise<Decision
       else {
         const NL = String.fromCharCode(10);
         const notes = r.evidence.map((e, i) => `${i + 1}. ${e}`).join(NL);
-        await paypal.provideEvidence(dp.realId, notes).catch(async e => { d.guardrails.push(`provide-evidence unavailable in this dispute state (${String(e.message).split("failed: ")[1]}) → evidence sent as a dispute message`); await paypal.sendDisputeMessage(dp.realId!, `Evidence from Brewlab:${NL}${notes}`); });
+        const tr = x.records?.trackingNumber ? { carrier: x.records.carrier ?? "OTHER", number: x.records.trackingNumber } : undefined;
+        await paypal.provideEvidence(dp.realId, notes, tr).catch(async e => { d.guardrails.push(`provide-evidence unavailable in this dispute state (${String(e.message).split("failed: ")[1]}) → evidence sent as a dispute message`); await paypal.sendDisputeMessage(dp.realId!, `Evidence from Brewlab:${NL}${notes}`); });
         d.status = "executed";
       }
     } catch (e: any) { d.status = "blocked"; d.guardrails.push(`PayPal error: ${String(e.message).slice(0, 120)}`); }

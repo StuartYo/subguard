@@ -94,7 +94,7 @@ npm run dev                  # http://localhost:3000
 
 ## Honest limitations
 
-- Disputes are real sandbox disputes opened by a sandbox buyer in PayPal's Resolution Center; **Sync disputes from PayPal** pulls them through the Disputes API and the agent accepts or submits evidence on them. If no real dispute exists yet (fresh setup), a simulated one in PayPal's payload shape is shown and labeled *simulated*.
+- Three real sandbox disputes were opened by a sandbox buyer in PayPal's Resolution Center. The agent accepted two (no proof of delivery; a not-as-described claim tracking can't answer) and **contested one**: tracking showed delivered and the customer had logged in the day before, so it submitted an evidence pack with the tracking number through `provide-evidence` (PayPal answered 200). Disputes are **Sync disputes from PayPal** pulls them through the Disputes API and the agent accepts or submits evidence on them. If no real dispute exists yet (fresh setup), a simulated one in PayPal's payload shape is shown and labeled *simulated*.
 - **6 of the 24 subscribers are live PayPal sandbox objects** (2 subscriptions, 4 captures; marked *PayPal live* in the grid). The other 18 are demo profiles, and actions on them are recorded as *simulated*.
 - Dispute decisions also use merchant records (boxes delivered, tracking, last login, reminder sent). PayPal doesn't hold these, so in the demo they are **seeded demo data**, labeled as such in the UI.
 - The exposure figure is the model's own risk estimate (risk × (charge + fee)), not a measured outcome.

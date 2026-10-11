@@ -27,7 +27,7 @@ export async function importDispute(s: Store, disputeId: string): Promise<Disput
     id: full.dispute_id, realId: full.dispute_id, paypalStatus: full.status, subscriberId: x.id,
     reason: REASON[full.reason] ?? "CANCELED_RECURRING_BILLING", amount: Number(full.dispute_amount?.value ?? x.paypal.chargeAmount ?? 0),
     createdAt: full.create_time, buyerNote: full.messages?.[0]?.content ?? sim?.buyerNote ?? `Buyer opened a ${full.reason?.toLowerCase().replaceAll("_", " ")} case in PayPal.`,
-    facts: sim?.facts ?? { deliveredShipments: x.monthsSubscribed, lastLoginDaysAgo: x.lastActiveDays, trackingDelivered: false, reminderSentBeforeRenewal: false }, status: "open",
+    facts: x.records ? { deliveredShipments: x.records.deliveredShipments, lastLoginDaysAgo: x.lastActiveDays, trackingDelivered: x.records.trackingDelivered, reminderSentBeforeRenewal: x.records.reminderSentBeforeRenewal } : sim?.facts ?? { deliveredShipments: x.monthsSubscribed, lastLoginDaysAgo: x.lastActiveDays, trackingDelivered: false, reminderSentBeforeRenewal: false }, status: "open",
   };
   s.disputes = [dp, ...s.disputes.filter(d => d !== sim)];
   return dp;

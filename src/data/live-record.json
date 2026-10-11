@@ -1,6 +1,50 @@
 {
-  "note": "Real sandbox run on 2026-10-11: hero decisions (Mia pause, Daniel refund, Omar injection), two buyer-opened disputes decided by the agent (accept-claim 200), and one autopilot run. Kept here because demo state on Vercel is not durable; shown as recorded in the UI.",
+  "note": "Real sandbox run on 2026-10-11: hero decisions (Mia pause, Daniel refund, Omar injection), three buyer-opened disputes decided by the agent (two accept-claim 200, one contested with provide-evidence 200), and one autopilot run. Kept here because demo state on Vercel is not durable; shown as recorded in the UI.",
   "disputes": [
+    {
+      "id": "PP-R-KQK-10191002",
+      "realId": "PP-R-KQK-10191002",
+      "paypalStatus": "WAITING_FOR_SELLER_RESPONSE",
+      "subscriberId": "sub_07",
+      "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+      "amount": 24,
+      "createdAt": "2026-10-11T12:32:34.320Z",
+      "buyerNote": "This month's Brewlab box never showed up at my door.",
+      "facts": {
+        "deliveredShipments": 14,
+        "lastLoginDaysAgo": 1,
+        "trackingDelivered": true,
+        "reminderSentBeforeRenewal": true
+      },
+      "status": "contested",
+      "decision": {
+        "at": "2026-10-11T12:36:41.745Z",
+        "action": "contest_dispute",
+        "reasoning": "The dispute matches a single $24 capture, and carrier tracking shows this box as delivered. The customer has received 14 straight shipments with no problems and logged into the app 1 day ago, so the account is active. Evidence is reasonably strong and the expected value favors contesting over accepting a $24 loss. The risk is that tracking may not include a signature or photo proof, so we should add the delivery address and date if we have them.",
+        "chargebackRisk": 1,
+        "expectedLoss": 39,
+        "actionCost": 13.65,
+        "guardrails": [
+          "Live PayPal dispute PP-R-KQK-10191002 (opened by the sandbox buyer)"
+        ],
+        "paypal": [
+          "POST /v1/customer/disputes/PP-R-KQK-10191002/provide-evidence → 200"
+        ],
+        "status": "executed",
+        "investigation": [
+          "list_paypal_disputes → {\"id\":\"PP-R-KQK-10191002\",\"reason\":\"MERCHANDISE_OR_SERVICE_NOT_RECEIVED\",\"status\":\"WAITING_FOR_SELLER_RESPONSE\",\"stage\":",
+          "get_paypal_capture → {\"status\":\"PENDING\",\"amount\":{\"value\":\"24.00\",\"currencyCode\":\"USD\"},\"create_time\":\"2026-10-11T12:30:16Z\"}"
+        ]
+      },
+      "evidence": [
+        "Carrier tracking confirms this month's box was marked delivered (delivered: true), including delivery date and address",
+        "Shipment history: 14 boxes delivered over 14 months to the same address with no prior non-receipt claims",
+        "Customer logged into the Brewlab app 1 day ago, showing an active account",
+        "Pre-renewal reminder was sent before this charge, with a pause/cancel link",
+        "PayPal capture 2Y64990636841030A for $24.00 matches the subscription price"
+      ],
+      "recorded": true
+    },
     {
       "id": "PP-R-CBH-10190989",
       "realId": "PP-R-CBH-10190989",
