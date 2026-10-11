@@ -42,6 +42,7 @@ export default function Home() {
 
   const refresh = useCallback(async () => setSt(await (await fetch("/api/state", { cache: "no-store" })).json()), []);
   useEffect(() => { fetch("/api/state", { cache: "no-store" }).then(r => r.json()).then(setSt); }, []);
+  useEffect(() => { if (tab !== "log") return; const t = setInterval(refresh, 5000); return () => clearInterval(t); }, [tab, refresh]);   // autopilot entries show up live
 
   const post = async (url: string, body: object, key: string) => {
     setBusy(b => ({ ...b, [key]: true })); setErr(null);
@@ -144,7 +145,7 @@ export default function Home() {
         {tab === "eval" && (
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 lg:col-span-2"><div className="flex items-baseline justify-between"><h3 className="font-semibold">Agent evaluation — 12 fixed scenarios, real model</h3><span className="text-right"><span className="text-2xl font-bold text-emerald-600">{EVAL.passed}/{EVAL.total}</span>{"rulesPassed" in EVAL && <span className="block text-xs text-slate-400">keyword rules: {(EVAL as any).rulesPassed}/{EVAL.total}</span>}</span></div>
-              <p className="text-xs text-slate-400">5 of the 12 are prompt-injection variants. "Keyword rules" is the hand-written policy a merchant would use instead (src/lib/baseline.ts). Run locally with POST /api/eval{EVAL.ranAt ? ` · last run ${new Date(EVAL.ranAt).toLocaleString()}` : ""}.</p>
+              <p className="text-xs text-slate-400">5 of the 12 are prompt-injection variants. &ldquo;Keyword rules&rdquo; is the hand-written policy a merchant would use instead (src/lib/baseline.ts). Run locally with POST /api/eval{EVAL.ranAt ? ` · last run ${new Date(EVAL.ranAt).toLocaleString()}` : ""}.</p>
               <table className="mt-3 w-full text-sm"><thead><tr className="text-left text-xs text-slate-400"><th className="py-1">Scenario</th><th>Expected</th><th>Keyword rules</th><th>Agent did</th><th></th></tr></thead><tbody>{EVAL.rows.map((r: any) => <tr key={r.case} className="border-t border-slate-100"><td className="py-1.5">{r.case}</td><td className="text-slate-500">{r.expect}</td><td className={`font-mono text-xs ${r.rulesPass === false ? "text-rose-600" : "text-slate-400"}`}>{r.rules ?? "—"}</td><td className="font-mono text-xs">{r.got}{r.flaggedInjection ? " · flagged" : ""}</td><td>{r.pass ? <span className="text-emerald-600">✓</span> : <span className="text-rose-600">✗</span>}</td></tr>)}</tbody></table></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">What it means for a real shop</h3><p className="text-xs text-slate-400">Assumptions: 40% of disputes are cancelled-recurring (CFPB), $15 fee per chargeback, prevention rate = exposure removed in this demo.</p>
               {([["subs", "Active subscribers"], ["price", "Avg. monthly price ($)"], ["rate", "Monthly dispute rate (%)"]] as const).map(([k, l]) => <label key={k} className="mt-3 block text-xs text-slate-500">{l}<input type="number" value={calc[k]} onChange={e => setCalc(c => ({ ...c, [k]: Number(e.target.value) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-800" /></label>)}
