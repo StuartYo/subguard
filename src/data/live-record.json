@@ -1,0 +1,89 @@
+{
+  "note": "Real sandbox disputes opened by a sandbox buyer on 2026-10-11 and decided by the agent (accept-claim 200). Kept here because demo state on Vercel is not durable.",
+  "disputes": [
+    {
+      "id": "PP-R-CBH-10190989",
+      "realId": "PP-R-CBH-10190989",
+      "paypalStatus": "RESOLVED",
+      "subscriberId": "sub_06",
+      "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+      "amount": 24,
+      "createdAt": "2026-10-11T11:14:08.289Z",
+      "buyerNote": "My Brewlab coffee box for this renewal never arrived.",
+      "facts": {
+        "deliveredShipments": 5,
+        "lastLoginDaysAgo": 27,
+        "trackingDelivered": false,
+        "reminderSentBeforeRenewal": false
+      },
+      "status": "accepted",
+      "decision": {
+        "at": "2026-10-11T11:26:58.595Z",
+        "action": "accept_dispute",
+        "reasoning": "Carrier tracking for this box shows it was not delivered, so we have no proof of delivery and the customer's claim looks genuine. Contesting would probably lose, which would cost the $24 charge, the $15 fee and 30 minutes of staff time. Accepting is cheaper. I couldn't pull more detail from PayPal: the dispute list returned only a count of 2 open disputes, with no subscription or capture ID to check. Please fix the shipping problem for this box and consider sending pre-renewal reminders, since none was sent this time.",
+        "chargebackRisk": 1,
+        "expectedLoss": 39,
+        "actionCost": 24,
+        "guardrails": [
+          "Live PayPal dispute PP-R-CBH-10190989 (opened by the sandbox buyer)"
+        ],
+        "paypal": [
+          "POST /v1/customer/disputes/PP-R-CBH-10190989/accept-claim → 200"
+        ],
+        "status": "executed",
+        "investigation": [
+          "list_paypal_disputes → {\"open_disputes\":2}"
+        ]
+      },
+      "evidence": [],
+      "recorded": true
+    },
+    {
+      "id": "PP-R-JHM-10190991",
+      "realId": "PP-R-JHM-10190991",
+      "paypalStatus": "RESOLVED",
+      "subscriberId": "sub_03",
+      "reason": "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED",
+      "amount": 24,
+      "createdAt": "2026-10-11T11:18:03.298Z",
+      "buyerNote": "Wrong beans in this month's Brewlab box.",
+      "facts": {
+        "deliveredShipments": 14,
+        "lastLoginDaysAgo": 2,
+        "trackingDelivered": true,
+        "reminderSentBeforeRenewal": true
+      },
+      "status": "accepted",
+      "decision": {
+        "at": "2026-10-11T11:30:57.767Z",
+        "action": "accept_dispute",
+        "reasoning": "The customer says the box had the wrong beans. Our tracking only shows the box was delivered. It doesn't show what was inside, so it doesn't answer a \"not as described\" claim. A fulfillment mix-up is plausible and we have no packing or content records to rebut it. Contesting would likely lose, costing the $24 plus the $15 fee and staff time, on a loyal 14-month subscriber. I recommend accepting, then reaching out with a warm apology and the correct beans or a credit to keep the relationship. I'd also check the pick/pack records for this order.",
+        "chargebackRisk": 1,
+        "expectedLoss": 39,
+        "actionCost": 24,
+        "guardrails": [
+          "Live PayPal dispute PP-R-JHM-10190991 (opened by the sandbox buyer)"
+        ],
+        "paypal": [
+          "POST /v1/customer/disputes/PP-R-JHM-10190991/accept-claim → 200"
+        ],
+        "status": "executed",
+        "investigation": [
+          "list_paypal_disputes → {\"open_disputes\":2}"
+        ]
+      },
+      "evidence": [],
+      "recorded": true
+    }
+  ],
+  "autopilot": [
+    {
+      "at": "2026-10-11T11:55:09.000Z",
+      "eventType": "BILLING.SUBSCRIPTION.ACTIVATED",
+      "eventId": "recorded-2026-10-11-mia",
+      "resourceId": "I-PUCYJHC7HM86",
+      "subscriberId": "sub_01",
+      "outcome": "agent decided: pause (executed) · recorded run"
+    }
+  ]
+}

@@ -164,8 +164,13 @@ export async function execute(store: Store, x: Subscriber, d: Decision) {
         } else d.status = "simulated";
         x.status = "paused"; credit(); break;
       case "downgrade":
-        if (x.paypal.subscriptionId && store.planIds.Basic) { await paypal.revisePlan(x.paypal.subscriptionId, store.planIds.Basic).then(r => { if (r?.links?.some((l: any) => l.rel === "approve")) d.guardrails.push("PayPal requires the customer to approve the new price → approval link included in the message"); return r; }).catch(e => { d.status = "simulated"; d.guardrails.push(`PayPal plan revision not possible yet (${String(e.message).split("failed: ")[1] ?? "error"}) → recorded, will apply at next approval`); }); }
-        else d.status = "simulated";
+        if (x.paypal.subscriptionId && store.planIds.Basic) {
+          // PayPal only applies a price change once the subscriber approves it, so the plan stays Pro until then.
+          let pending = false;
+          await paypal.revisePlan(x.paypal.subscriptionId, store.planIds.Basic).then(r => { if (r?.links?.some((l: any) => l.rel === "approve")) { pending = true; d.guardrails.push("PayPal requires the customer to approve the new price → approval link included in the message"); } return r; })
+            .catch(e => { pending = true; d.status = "blocked"; d.guardrails.push(`PayPal refused the plan revision (${String(e.message).split("failed: ")[1] ?? "error"}) → nothing changed`); });
+          if (pending) { x.status = "downgrade pending"; credit(); break; }
+        } else d.status = "simulated";
         x.status = "downgraded"; x.plan = "Basic"; credit(); break;
       case "refund": {
         const cap = x.paypal.captureId;

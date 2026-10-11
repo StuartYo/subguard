@@ -4,7 +4,9 @@ import { NextResponse, after } from "next/server";
 import * as paypal from "@/lib/paypal";
 import { load, save } from "@/lib/store";
 import { handleEvent } from "@/lib/autopilot";
+import { allow } from "@/lib/ratelimit";
 export async function POST(req: Request) {
+  if (!allow(req, "webhook", 300)) return NextResponse.json({ error: "rate limited" }, { status: 429 });   // unverified POSTs must not fan out into PayPal calls
   const event = await req.json();
   const url = new URL(req.url); url.search = "";
   try {

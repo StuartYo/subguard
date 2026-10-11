@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 // Sandbox object IDs created by /setup (not secrets) so a fresh deploy uses the same real PayPal objects.
 import IDS from "@/data/paypal-ids.json";
+import LIVE from "@/data/live-record.json";
 
 export type Plan = "Basic" | "Pro";
 export const PRICE: Record<Plan, number> = { Basic: 12, Pro: 24 };
@@ -28,7 +29,7 @@ export type Subscriber = {
   monthsSubscribed: number; lastActiveDays: number; skippedShipments: number; emailsUnopened: number;
   renewalInDays: number; lastChargeDaysAgo: number | null;
   supportMessage?: string;
-  status: "active" | "paused" | "downgraded" | "refunded" | "cancelled";
+  status: "active" | "paused" | "downgraded" | "downgrade pending" | "refunded" | "cancelled";
   paypal: { subscriptionId?: string; subscriptionStatus?: string; captureId?: string; orderId?: string; chargeAmount?: number; refunded?: boolean };
   decisions: Decision[];
 };
@@ -38,7 +39,7 @@ export type Dispute = {
   amount: number; createdAt: string; buyerNote: string;
   facts: { deliveredShipments: number; lastLoginDaysAgo: number; trackingDelivered: boolean; reminderSentBeforeRenewal: boolean };
   status: "open" | "accepted" | "contested"; decision?: Decision; evidence?: string[];
-  realId?: string; paypalStatus?: string;   // set when the dispute exists in PayPal (opened by a sandbox buyer)
+  realId?: string; paypalStatus?: string; recorded?: boolean;   // set when the dispute exists in PayPal (opened by a sandbox buyer)
 };
 
 export type Store = {
@@ -74,7 +75,7 @@ function seed(): Store {
   set(9, { lastActiveDays: 22, skippedShipments: 1, renewalInDays: 6 });
   const ids = IDS as { planCycle?: "DAY"; productId?: string; planIds?: Partial<Record<Plan, string>>; subscribers?: Record<string, Subscriber["paypal"]> };
   subs.forEach(x => { if (ids.subscribers?.[x.id]) x.paypal = { ...ids.subscribers[x.id] }; if (x.paypal.captureId && x.lastChargeDaysAgo === null) x.lastChargeDaysAgo = 1; });
-  return {
+  const st: Store = {
     merchant: "Brewlab", productId: ids.productId, planIds: ids.planIds ?? {}, planCycle: (ids as any).planCycle, subscribers: subs,
     disputes: [{
       id: "PP-D-27411", subscriberId: "sub_03", reason: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED", amount: 24, createdAt: new Date().toISOString(),
@@ -87,6 +88,11 @@ function seed(): Store {
     }],
     saved: { preventedChargebacks: 0, dollarsSaved: 0, refundsIssued: 0 }, refundsToday: 0, injectionBlocks: [],
   };
+  // Real disputes the agent already decided (see live-record.json) replace the simulated ones, so every visitor sees them.
+  const live = LIVE as unknown as { disputes: Dispute[]; autopilot: Store["autopilot"] };
+  for (const dp of live.disputes) st.disputes = [dp, ...st.disputes.filter(d => d.subscriberId !== dp.subscriberId)];
+  st.autopilot = live.autopilot;
+  return st;
 }
 
 const FILE = process.env.VERCEL ? "/tmp/subguard-store.json" : path.join(process.cwd(), ".data", "store.json");

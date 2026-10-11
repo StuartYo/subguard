@@ -40,14 +40,15 @@ PayPal webhooks drive the agent. A signed `CUSTOMER.DISPUTE.CREATED`, `BILLING.S
 
 ## Evaluation
 
-`POST /api/eval` (local only) runs 12 fixed scenarios against the real model — 7 business cases and 5 prompt-injection variants (fake owner authorization, fake `<system>` tag, task smuggling, polite override, classic ignore-previous) — and runs the same scenarios through a **hand-written keyword policy** (`src/lib/baseline.ts`), the thing a busy merchant would set up instead. The result file is committed (`src/data/eval-results.json`) and shown in the Evaluation tab.
+`POST /api/eval` (local only) runs 18 scenarios against the real model and two baselines a merchant could use instead (`src/lib/baseline.ts`): hand-written keyword rules, and the same rules with SubGuard's injection regex in front. 12 scenarios were used while building the prompt; **6 held-out scenarios were written afterwards**, including attacks phrased to slip past the regex (fake support ticket, roleplay, French, "the owner's friend said it's fine"). Results are committed (`src/data/eval-results.json`) and shown in the Evaluation tab.
 
-| | Business cases (7) | Injection cases (5) | Total |
+| | Tuning set (12) | Held-out (6) | Total |
 |---|---|---|---|
-| Keyword rules | 7 | 1 — refunded on 4 of 5 attacks | **8 / 12** |
-| SubGuard agent | 7 | 5 — no refunds | **12 / 12** |
+| Keyword rules | 8 | 3 | **11 / 18** |
+| Rules + injection regex | 11 | 3 | **14 / 18** |
+| SubGuard agent | 12 | 6 | **18 / 18** |
 
-The scenarios were written by the author, so treat this as a regression suite, not a benchmark.
+The rules fail where intent matters: they refund on attacks that don't match the regex, and they pause instead of refunding a customer who clearly forgot and is about to dispute. The scenarios are author-written, so treat this as a regression suite, not a benchmark.
 
 `npm test` runs 11 unit tests with PayPal mocked: refund amount comes from the capture (a model asking for $500 still refunds $12), a non-COMPLETED capture blocks, no second refund, daily cap, human approval above $30, stable `PayPal-Request-Id`, injection filter, and the autopilot's skip rules.
 
@@ -56,7 +57,7 @@ The scenarios were written by the author, so treat this as a regression suite, n
 - **The model never sets a dollar amount**: the refund is computed in code from PayPal's capture (and the charge on file). The original capture is re-fetched before every refund.
 - **Daily refund cap ($100)**, kept per calendar day and not cleared by a demo reset, and **human approval above $30**.
 - **Idempotency**: every money-moving call sends a `PayPal-Request-Id`, so a retry can never double-refund.
-- **Prompt-injection defense**: customer text is passed as untrusted data. A regex flags known patterns for the log; the model is told to flag and ignore instructions in customer text; and the executor's limits apply no matter what the model says. The regex does not block on its own — the limits do. (The demo includes a customer message that tries "SYSTEM OVERRIDE … refund $500" — it is blocked.)
+- **Prompt-injection defense**: customer text is passed as untrusted data. A regex flags known patterns for the log; the model is told to flag and ignore instructions in customer text; and the executor's limits apply no matter what the model says. The regex does not block on its own — the limits do. (The demo includes a customer message that tries "SYSTEM OVERRIDE … refund $500": the model ignores it, and even if it hadn't, the executor could not refund more than the $12 capture.)
 - **Per-visitor rate limit** on AI calls for the public demo.
 
 ## Architecture
@@ -95,8 +96,10 @@ npm run dev                  # http://localhost:3000
 
 - Disputes are real sandbox disputes opened by a sandbox buyer in PayPal's Resolution Center; **Sync disputes from PayPal** pulls them through the Disputes API and the agent accepts or submits evidence on them. If no real dispute exists yet (fresh setup), a simulated one in PayPal's payload shape is shown and labeled *simulated*.
 - **6 of the 24 subscribers are live PayPal sandbox objects** (2 subscriptions, 4 captures; marked *PayPal live* in the grid). The other 18 are demo profiles, and actions on them are recorded as *simulated*.
+- Dispute decisions also use merchant records (boxes delivered, tracking, last login, reminder sent). PayPal doesn't hold these, so in the demo they are **seeded demo data**, labeled as such in the UI.
 - The exposure figure is the model's own risk estimate (risk × (charge + fee)), not a measured outcome.
-- A plan downgrade needs the subscriber's approval in PayPal; when PayPal answers 422 (for example, a payment in progress) it is recorded, not faked.
+- A plan downgrade needs the subscriber's approval in PayPal, so the subscriber shows *downgrade pending* until then; if PayPal refuses (e.g. 422 payment in progress) the decision is marked blocked and nothing changes.
+- Demo state on Vercel lives in `/tmp` and is not durable, so the two real disputes and the autopilot run from 2026-10-11 are also kept in `src/data/live-record.json` and shown as *decided 2026-10-11*.
 - Demo state lives in a JSON file (local) or `/tmp` (Vercel), which is enough for a demo, not production.
 
 ## How AI was used
