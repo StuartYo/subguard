@@ -50,7 +50,7 @@ const disputeTool: Anthropic.Tool = {
       action: { type: "string", enum: ["accept_dispute", "contest_dispute"] },
       win_probability: { type: "number" },
       reasoning: { type: "string", description: "2-3 sentences a merchant can read" },
-      evidence: { type: "array", items: { type: "string" }, description: "Up to 5 short evidence items to attach if contesting; empty if accepting" },
+      evidence: { type: "array", items: { type: "string" }, description: "Up to 5 short evidence items to attach if contesting; empty if accepting. Cite only facts given above (records, PayPal data); never invent dates, addresses or documents." },
     },
     required: ["action", "win_probability", "reasoning", "evidence"],
   },
@@ -231,7 +231,8 @@ export async function decideDispute(store: Store, dp: Dispute): Promise<Decision
     d.guardrails = [`Live PayPal dispute ${dp.realId} (opened by the sandbox buyer)`];
     const n = paypal.apiCalls().length;
     try {
-      if (r.action === "accept_dispute") { await paypal.acceptClaim(dp.realId, `Brewlab accepts this claim. ${r.reasoning}`); d.status = "executed"; }
+      if (r.action === "accept_dispute" && dp.amount > APPROVAL_THRESHOLD) { d.status = "awaiting_approval"; d.guardrails.push(`Accepting returns $${dp.amount} (over $${APPROVAL_THRESHOLD}) → waiting for a human click`); }
+      else if (r.action === "accept_dispute") { d.guardrails.push(`Accepting returns $${dp.amount} (≤ $${APPROVAL_THRESHOLD}, the same limit as refunds)`); await paypal.acceptClaim(dp.realId, `Brewlab accepts this claim. ${r.reasoning}`); d.status = "executed"; }
       else {
         const NL = String.fromCharCode(10);
         const notes = r.evidence.map((e, i) => `${i + 1}. ${e}`).join(NL);
@@ -242,6 +243,6 @@ export async function decideDispute(store: Store, dp: Dispute): Promise<Decision
     } catch (e: any) { d.status = "blocked"; d.guardrails.push(`PayPal error: ${String(e.message).slice(0, 120)}`); }
     d.paypal = paypal.apiCalls().slice(n).map(c => `${c.method} ${c.path} → ${c.status}`);
   }
-  dp.status = r.action === "accept_dispute" ? "accepted" : "contested"; dp.decision = d; dp.evidence = r.evidence;
+  dp.status = d.status === "awaiting_approval" ? "open" : r.action === "accept_dispute" ? "accepted" : "contested"; dp.decision = d; dp.evidence = r.evidence;
   return d;
 }

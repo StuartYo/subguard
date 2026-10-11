@@ -5,9 +5,12 @@ const pp = vi.hoisted(() => ({
   calls: [] as { method: string; path: string; status: number }[],
   capture: { status: "COMPLETED", amount: { value: "12.00" } } as any,
   refunds: [] as { id: string; amount: string; key: string }[],
+  accepted: 0,
+  model: null as any,
 }));
 vi.mock("./paypal", () => ({
   apiCalls: () => pp.calls,
+  acceptClaim: async () => { pp.accepted++; return {}; },
   listDisputes: async () => ({ items: [] }),
 }));
 vi.mock("./paypal-sdk", () => ({
@@ -16,9 +19,9 @@ vi.mock("./paypal-sdk", () => ({
   getSubscription: async () => ({ status: "ACTIVE" }),
   suspendSubscription: async () => undefined,
 }));
-vi.mock("@anthropic-ai/sdk", () => ({ default: class { messages = { create: vi.fn() }; } }));
+vi.mock("@anthropic-ai/sdk", () => ({ default: class { messages = { create: async () => pp.model }; } }));
 
-import { execute, refundAmount, INJECTION } from "./agent";
+import { execute, refundAmount, INJECTION, decideDispute } from "./agent";
 import { handleEvent } from "./autopilot";
 import type { Decision, Store, Subscriber } from "./store";
 
@@ -90,5 +93,22 @@ describe("autopilot", () => {
   it("ignores events for unknown resources", async () => {
     const e = await handleEvent(store(), { id: "WH-3", event_type: "BILLING.SUBSCRIPTION.UPDATED", resource: { id: "I-NOPE" } });
     expect(e.outcome).toBe("no matching subscriber");
+  });
+});
+
+describe("dispute guardrails", () => {
+  const acceptReply = { stop_reason: "tool_use", content: [{ type: "tool_use", id: "t1", name: "decide_dispute", input: { action: "accept_dispute", win_probability: 0.1, reasoning: "No proof of delivery.", evidence: [] } }] };
+  const dispute = (amount: number) => ({ id: "PP-T", realId: "PP-T", subscriberId: "sub_t", reason: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED", amount, createdAt: "", buyerNote: "never arrived", facts: { deliveredShipments: 1, lastLoginDaysAgo: 30, trackingDelivered: false, reminderSentBeforeRenewal: false }, status: "open" } as any);
+  it("accepting a dispute above $30 waits for a human", async () => {
+    pp.accepted = 0; pp.model = acceptReply;
+    const s = store(); s.subscribers = [sub()]; const dp = dispute(39);
+    const d = await decideDispute(s, dp);
+    expect(d.status).toBe("awaiting_approval"); expect(pp.accepted).toBe(0); expect(dp.status).toBe("open");
+  });
+  it("accepting a small dispute goes through", async () => {
+    pp.accepted = 0; pp.model = acceptReply;
+    const s = store(); s.subscribers = [sub()];
+    const d = await decideDispute(s, dispute(12));
+    expect(d.status).toBe("executed"); expect(pp.accepted).toBe(1);
   });
 });
