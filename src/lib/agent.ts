@@ -173,9 +173,10 @@ async function execute(store: Store, x: Subscriber, d: Decision) {
         if (x.paypal.refunded) { d.status = "blocked"; d.guardrails.push("Already refunded once → blocked (idempotency)"); break; }
         const original: any = await paypal.getCapture(cap);
         if (original.status !== "COMPLETED") { d.status = "blocked"; d.guardrails.push(`Original capture is ${original.status} in PayPal → no second refund`); x.paypal.refunded = true; x.status = "refunded"; break; }
-        const amount = Math.min(Number(original.amount.value), d.actionCost || Number(original.amount.value));
+        const amount = refundAmount(Number(original.amount.value), x.paypal.chargeAmount);
         d.guardrails.push(`Re-verified original capture in PayPal: $${original.amount.value} ${original.status}`);
-        d.guardrails.push(`Refund $${amount} ≤ original charge ✓`);
+        d.guardrails.push(`Refund amount set by code from PayPal's capture, not by the model: $${amount}`);
+        const today = new Date().toISOString().slice(0, 10); if (store.refundDay !== today) { store.refundDay = today; store.refundsToday = 0; }
         if (store.refundsToday + amount > REFUND_DAILY_CAP) { d.status = "blocked"; d.guardrails.push(`Daily refund cap $${REFUND_DAILY_CAP} would be exceeded → blocked`); break; }
         d.guardrails.push(`Daily refund cap: $${store.refundsToday + amount} / $${REFUND_DAILY_CAP} ✓`);
         if (amount > APPROVAL_THRESHOLD) { d.status = "awaiting_approval"; d.guardrails.push(`Over $${APPROVAL_THRESHOLD} → waiting for a human click`); break; }
@@ -189,12 +190,20 @@ async function execute(store: Store, x: Subscriber, d: Decision) {
   mark();
 }
 
+// The refund amount is never taken from the model: it is the smaller of PayPal's capture and the charge on file.
+export function refundAmount(captured: number, chargeOnFile?: number) {
+  return Math.round(Math.min(captured, chargeOnFile ?? captured) * 100) / 100;
+}
+
 export async function approveRefund(store: Store, x: Subscriber) {
   const d = x.decisions.find(z => z.status === "awaiting_approval" && z.action === "refund");
   if (!d || !x.paypal.captureId) throw new Error("nothing to approve");
   d.guardrails.push("Approved by a human");
-  await paypal.refundCapture(x.paypal.captureId, Math.min(d.actionCost, x.paypal.chargeAmount ?? d.actionCost).toFixed(2), d.message ?? "Refund from Brewlab", `refund-${x.id}-${x.paypal.captureId}`);
-  x.paypal.refunded = true; x.status = "refunded"; d.status = "executed"; store.saved.refundsIssued += d.actionCost;
+  const original: any = await paypal.getCapture(x.paypal.captureId);
+  if (original.status !== "COMPLETED") throw new Error(`capture is ${original.status}`);
+  const amount = refundAmount(Number(original.amount.value), x.paypal.chargeAmount);
+  await paypal.refundCapture(x.paypal.captureId, amount.toFixed(2), d.message ?? "Refund from Brewlab", `refund-${x.id}-${x.paypal.captureId}`);
+  x.paypal.refunded = true; x.status = "refunded"; d.status = "executed"; store.refundsToday += amount; store.saved.refundsIssued += amount;
 }
 
 export async function decideDispute(store: Store, dp: Dispute): Promise<Decision> {

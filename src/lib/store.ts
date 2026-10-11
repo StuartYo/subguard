@@ -45,8 +45,9 @@ export type Store = {
   merchant: string; productId?: string; planIds: Partial<Record<Plan, string>>; planCycle?: "DAY";
   subscribers: Subscriber[]; disputes: Dispute[];
   saved: { preventedChargebacks: number; dollarsSaved: number; refundsIssued: number };
-  refundsToday: number;
+  refundsToday: number; refundDay?: string;
   injectionBlocks: { at: string; subscriberId: string; excerpt: string }[];
+  autopilot?: import("./autopilot").AutopilotEntry[];
 };
 
 const FIRST = ["Mia", "Daniel", "Priya", "Lena", "Omar", "Sofia", "Kenji", "Ava", "Lucas", "Hana", "Noah", "Zoe", "Mateo", "Iris", "Ethan", "Yuna", "Leo", "Chloe", "Ravi", "Emma", "Jonas", "Aiko", "Sam", "Nora"];
@@ -96,7 +97,7 @@ export function load(): Store {
   return mem!;
 }
 export function save(s: Store) { mem = s; try { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(s, null, 2)); } catch {} }
-export function reset() { const keep = load(); const s = seed(); s.productId = keep.productId; s.planIds = keep.planIds; s.planCycle = keep.planCycle; s.subscribers.forEach((x, i) => (x.paypal = keep.subscribers[i]?.paypal ?? {})); save(s); return s; }
+export function reset() { const keep = load(); const s = seed(); s.productId = keep.productId; s.planIds = keep.planIds; s.planCycle = keep.planCycle; s.subscribers.forEach((x, i) => (x.paypal = keep.subscribers[i]?.paypal ?? {})); s.refundsToday = keep.refundsToday; s.refundDay = keep.refundDay; s.autopilot = keep.autopilot; /* the daily cap and the webhook history survive a demo reset */ save(s); return s; }
 
 // Simple, explainable risk score shown in the grid (the agent makes the actual call).
 export function riskScore(x: Subscriber) {

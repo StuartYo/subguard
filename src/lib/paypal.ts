@@ -85,7 +85,7 @@ export async function provideEvidence(id: string, notes: string, evidenceType = 
 export const listDisputes = () => pp("GET", `/v1/customer/disputes?page_size=50&start_time=${new Date(Date.now() - 90 * 864e5).toISOString()}`, undefined, { summary: "list open disputes" });
 
 // ── Webhooks: PayPal pushes real events (subscription suspended, refund completed, dispute created) ──
-export const WEBHOOK_EVENTS = ["BILLING.SUBSCRIPTION.SUSPENDED", "BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.UPDATED", "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.REFUNDED", "CUSTOMER.DISPUTE.CREATED", "CUSTOMER.DISPUTE.UPDATED"];
+export const WEBHOOK_EVENTS = ["BILLING.SUBSCRIPTION.SUSPENDED", "BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.UPDATED", "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.REFUNDED", "PAYMENT.SALE.COMPLETED", "BILLING.SUBSCRIPTION.PAYMENT.FAILED", "CUSTOMER.DISPUTE.CREATED", "CUSTOMER.DISPUTE.UPDATED"];
 export const listWebhooks = () => pp("GET", "/v1/notifications/webhooks", undefined, { summary: "list webhooks" });
 export const createWebhook = (url: string) => pp("POST", "/v1/notifications/webhooks", { url, event_types: WEBHOOK_EVENTS.map(name => ({ name })) }, { summary: "register webhook" });
 export const listWebhookEvents = () => pp("GET", "/v1/notifications/webhooks-events?page_size=25", undefined, { summary: "list webhook events" });
