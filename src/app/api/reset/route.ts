@@ -6,7 +6,7 @@ import { syncFromPayPal } from "@/lib/agent";
 export async function POST() {
   const s = reset();
   for (const x of s.subscribers) {
-    if (!x.paypal.subscriptionId) continue;
+    if (!x.paypal.subscriptionId || x.status === "paused") continue;   // recorded pauses stay paused in PayPal
     try { const sub: any = await paypal.getSubscription(x.paypal.subscriptionId); if (sub.status === "SUSPENDED") await paypal.activateSubscription(x.paypal.subscriptionId, "Demo reset"); x.paypal.subscriptionStatus = "ACTIVE"; await syncFromPayPal(x); } catch {}
   }
   save(s);

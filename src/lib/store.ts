@@ -21,7 +21,7 @@ export type Decision = {
   paypal: string[];              // PayPal API calls made for this decision
   status: "executed" | "awaiting_approval" | "blocked" | "simulated";
   message?: string;              // message sent to the customer
-  investigation?: string[];      // read-only PayPal lookups the agent chose to make before deciding
+  investigation?: string[]; recorded?: boolean;      // read-only PayPal lookups the agent chose to make before deciding
 };
 
 export type Subscriber = {
@@ -89,9 +89,10 @@ function seed(): Store {
     saved: { preventedChargebacks: 0, dollarsSaved: 0, refundsIssued: 0 }, refundsToday: 0, injectionBlocks: [],
   };
   // Real disputes the agent already decided (see live-record.json) replace the simulated ones, so every visitor sees them.
-  const live = LIVE as unknown as { disputes: Dispute[]; autopilot: Store["autopilot"] };
+  const live = LIVE as unknown as { disputes: Dispute[]; autopilot: Store["autopilot"]; subscribers: Record<string, Pick<Subscriber, "status" | "decisions">>; saved: Store["saved"]; injectionBlocks: Store["injectionBlocks"] };
   for (const dp of live.disputes) st.disputes = [dp, ...st.disputes.filter(d => d.subscriberId !== dp.subscriberId)];
-  st.autopilot = live.autopilot;
+  for (const x of st.subscribers) if (live.subscribers[x.id]) Object.assign(x, live.subscribers[x.id]);
+  st.autopilot = live.autopilot; st.saved = { ...live.saved }; st.injectionBlocks = [...live.injectionBlocks];
   return st;
 }
 
