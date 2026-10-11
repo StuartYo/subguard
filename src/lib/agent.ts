@@ -64,14 +64,17 @@ const READ_TOOLS: Anthropic.Tool[] = [
   { name: "get_paypal_subscription", description: "Fetch the live PayPal subscription (status, plan, next billing time, last payment).", input_schema: { type: "object", properties: { subscription_id: { type: "string" } }, required: ["subscription_id"] } },
   { name: "get_paypal_capture", description: "Fetch a PayPal payment capture (amount, status, refunds) to verify a charge before deciding on a refund.", input_schema: { type: "object", properties: { capture_id: { type: "string" } }, required: ["capture_id"] } },
   { name: "list_subscription_transactions", description: "List the subscription's recent PayPal billing transactions (last 90 days).", input_schema: { type: "object", properties: { subscription_id: { type: "string" } }, required: ["subscription_id"] } },
-  { name: "list_paypal_disputes", description: "List open disputes on the merchant's PayPal account.", input_schema: { type: "object", properties: {} } },
+  { name: "list_paypal_disputes", description: "List recent disputes on the merchant's PayPal account (id, reason, status, amount). Pass dispute_id to get one dispute with its disputed capture id and buyer messages.", input_schema: { type: "object", properties: { dispute_id: { type: "string" } } } },
 ];
 async function runReadTool(name: string, input: any) {
   try {
     if (name === "get_paypal_subscription") { const r: any = await paypal.getSubscription(input.subscription_id); return { status: r.status, plan_id: r.planId, next_billing_time: r.billingInfo?.nextBillingTime, last_payment: r.billingInfo?.lastPayment }; }
     if (name === "get_paypal_capture") { const r: any = await paypal.getCapture(input.capture_id); return { status: r.status, amount: r.amount, create_time: r.createTime }; }
     if (name === "list_subscription_transactions") { const r: any = await paypal.listSubscriptionTransactions(input.subscription_id); return { transactions: (r.transactions ?? []).slice(0, 5).map((t: any) => ({ status: t.status, time: t.time, amount: t.amountWithBreakdown?.grossAmount?.value })) }; }
-    if (name === "list_paypal_disputes") { const r = await paypal.listDisputes(); return { open_disputes: r.items?.length ?? 0 }; }
+    if (name === "list_paypal_disputes") {
+      if (input.dispute_id) { const d: any = await paypal.getDispute(input.dispute_id); return { id: d.dispute_id, reason: d.reason, status: d.status, stage: d.dispute_life_cycle_stage, amount: d.dispute_amount?.value, capture_ids: (d.disputed_transactions ?? []).map((t: any) => t.seller_transaction_id), buyer_messages: (d.messages ?? []).slice(0, 3).map((m: any) => m.content) }; }
+      const r = await paypal.listDisputes(); return { disputes: (r.items ?? []).slice(0, 10).map((d: any) => ({ id: d.dispute_id, reason: d.reason, status: d.status, amount: d.dispute_amount?.value, created: d.create_time })) };
+    }
   } catch (e: any) { return { error: String(e.message).slice(0, 160) }; }
   return { error: "unknown tool" };
 }
