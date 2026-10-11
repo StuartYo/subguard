@@ -51,7 +51,7 @@ PayPal webhooks drive the agent. A signed `CUSTOMER.DISPUTE.CREATED`, `BILLING.S
 
 What this shows, honestly: on these scenarios a modern model already makes good calls; hand-written rules don't. SubGuard's edge is not better judgment than the bare model; it is what surrounds the judgment: it **checks PayPal before acting** (a plain prompt can't know whether a charge was already refunded or disputed), the **money limits live in code** and hold even when the model is fooled (unit test: a model output asking for $500 still refunds exactly the $12 capture), and it **runs and acts on its own** from verified webhooks. The first run of this suite also caught a real bug (a cancel request got a reminder, which doesn't stop the charge); the prompt was fixed without touching the held-out set. Scenarios are author-written, so treat this as a regression suite, not a benchmark.
 
-`npm test` runs 13 unit tests with PayPal mocked: refund amount comes from the capture (a model asking for $500 still refunds $12), a non-COMPLETED capture blocks, no second refund, daily cap, human approval above $30, stable `PayPal-Request-Id`, injection filter, the autopilot's skip rules, and the human-approval rule for accepting disputes over $30.
+`npm test` runs 16 unit tests with PayPal mocked: refund amount comes from the capture (a model asking for $500 still refunds $12), a non-COMPLETED capture blocks, no second refund, daily cap, human approval above $30, stable `PayPal-Request-Id`, injection filter, the autopilot's skip rules, the human-approval rule for accepting disputes over $30, and the webhook endpoint (forged signature → 400, a redelivered event id never runs the agent twice).
 
 ## Guardrails (an agent that moves money has to be safe)
 
@@ -101,6 +101,7 @@ npm run dev                  # http://localhost:3000
 - Dispute decisions also use merchant records (boxes delivered, tracking, last login, reminder sent). PayPal doesn't hold these, so in the demo they are **seeded demo data**, labeled as such in the UI.
 - The exposure figure is the model's own risk estimate (risk × (charge + fee)), not a measured outcome.
 - A plan downgrade needs the subscriber's approval in PayPal, so the subscriber shows *downgrade pending* until then; if PayPal refuses (e.g. 422 payment in progress) the decision is marked blocked and nothing changes.
+- A capture under dispute shows `PENDING` in PayPal: PayPal holds the funds while the case is open. That is why Kenji's capture reads PENDING in the demo.
 - Demo state on Vercel lives in `/tmp` and is not durable, so the two real disputes and the autopilot run from 2026-10-11 are also kept in `src/data/live-record.json` and shown as *decided 2026-10-11*.
 - Demo state lives in a JSON file (local) or `/tmp` (Vercel), which is enough for a demo, not production.
 
