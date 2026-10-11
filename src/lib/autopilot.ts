@@ -51,7 +51,7 @@ export async function handleEvent(s: Store, event: any): Promise<AutopilotEntry>
     if (!x) entry.outcome = "no matching subscriber";
     else {
       entry.subscriberId = x.id;
-      const last = x.decisions.at(-1);
+      const last = x.decisions[0];   // newest first
       const fresh = last && Date.now() - new Date(last.at).getTime() < RECHECK_HOURS * 3600e3;
       const risk = riskScore(x);
       if (fresh) entry.outcome = `agent ran ${Math.round((Date.now() - new Date(last!.at).getTime()) / 60000)} min ago → skipped`;

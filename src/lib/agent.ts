@@ -10,7 +10,7 @@ const MODEL = process.env.SUBGUARD_MODEL ?? "claude-sonnet-5-5";
 const REFUND_DAILY_CAP = 100;      // USD per day across all customers
 const APPROVAL_THRESHOLD = 30;     // refunds above this need a human click
 
-const INJECTION = /(ignore (all |the )?(previous|prior|above)|system override|admin mode|you are now|do not log|developer mode|jailbreak|<\/?system>|new policy|i authori[sz]e you|must (always )?obey)/i;
+export const INJECTION = /(ignore (all |the )?(previous|prior|above)|system override|admin mode|you are now|do not log|developer mode|jailbreak|<\/?system>|new policy|i authori[sz]e you|must (always )?obey)/i;
 
 const SYSTEM = `You are SubGuard, the retention-and-disputes agent for a small subscription merchant that bills through PayPal.
 Goal: prevent chargebacks before they happen while keeping good customers. A chargeback costs the merchant a ~$${CHARGEBACK_FEE} fee, the goods, and raises its dispute ratio (too high a ratio can get the merchant's account restricted).
@@ -146,7 +146,7 @@ export async function decideForSubscriber(store: Store, x: Subscriber): Promise<
   return decision;
 }
 
-async function execute(store: Store, x: Subscriber, d: Decision) {
+export async function execute(store: Store, x: Subscriber, d: Decision) {
   const n = paypal.apiCalls().length;
   const mark = () => (d.paypal = paypal.apiCalls().slice(n).map(c => `${c.method} ${c.path} → ${c.status}`));
   const credit = () => { store.saved.preventedChargebacks += d.chargebackRisk >= 0.5 ? 1 : 0; store.saved.dollarsSaved += Math.max(0, Math.round((d.expectedLoss - d.actionCost) * 100) / 100); };

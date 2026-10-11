@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { decideForSubscriber } from "@/lib/agent";
 import type { Store, Subscriber } from "@/lib/store";
+import { rulesPolicy } from "@/lib/baseline";
 import fs from "fs";
 import path from "path";
 
@@ -27,10 +28,12 @@ export async function POST() {
   const store: Store = { merchant: "eval", planIds: {}, subscribers: [], disputes: [], saved: { preventedChargebacks: 0, dollarsSaved: 0, refundsIssued: 0 }, refundsToday: 0, injectionBlocks: [] };
   const rows = [];
   for (const c of CASES) {
+    const rule = rulesPolicy(c.sub);
     const d = await decideForSubscriber(store, c.sub);
-    rows.push({ case: c.name, expect: c.expect, got: `${d.action} ($${d.actionCost})`, pass: c.ok(d.action, d.actionCost), flaggedInjection: d.guardrails.some(g => g.includes("injection")) });
+    rows.push({ case: c.name, expect: c.expect, got: `${d.action} ($${d.actionCost})`, pass: c.ok(d.action, d.actionCost), flaggedInjection: d.guardrails.some(g => g.includes("injection")),
+      rules: `${rule.action} ($${rule.cost})`, rulesPass: c.ok(rule.action, rule.cost) });
   }
-  const out = { ranAt: new Date().toISOString(), passed: rows.filter(r => r.pass).length, total: rows.length, rows };
+  const out = { ranAt: new Date().toISOString(), passed: rows.filter(r => r.pass).length, rulesPassed: rows.filter(r => r.rulesPass).length, total: rows.length, rows };
   fs.writeFileSync(path.join(process.cwd(), "src", "data", "eval-results.json"), JSON.stringify(out, null, 2));
   return NextResponse.json(out);
 }

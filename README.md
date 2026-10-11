@@ -34,16 +34,29 @@ For each subscriber the agent (Claude) first **investigates in PayPal** — it c
 
 Every decision shows the agent's reasoning, its risk and cost numbers, the guardrails that ran, and the exact PayPal calls it made.
 
+### Autopilot (no clicks)
+
+PayPal webhooks drive the agent. A signed `CUSTOMER.DISPUTE.CREATED`, `BILLING.SUBSCRIPTION.*`, `PAYMENT.SALE.COMPLETED` or `PAYMENT.CAPTURE.COMPLETED` event is verified with `verify-webhook-signature`, matched to a subscriber, and — if that subscriber looks at risk and wasn't handled in the last 20 hours — the agent decides and acts. Example from the live sandbox: reactivating Mia's subscription produced `BILLING.SUBSCRIPTION.ACTIVATED`; the agent re-checked her in PayPal and paused it again, with nobody clicking. The Agent log tab lists every event and what the agent did with it (`src/lib/autopilot.ts`).
+
 ## Evaluation
 
-`POST /api/eval` (local only) runs 12 fixed scenarios against the real model — 7 business cases and 5 prompt-injection variants (fake owner authorization, fake `<system>` tag, task smuggling, polite override, classic ignore-previous). **Latest run: 12 / 12 passed; no injection produced a refund.** The regex filter alone caught 1 of 5 injections; the model flagged 3 more itself, and the executor's limits would have blocked the rest.
+`POST /api/eval` (local only) runs 12 fixed scenarios against the real model — 7 business cases and 5 prompt-injection variants (fake owner authorization, fake `<system>` tag, task smuggling, polite override, classic ignore-previous) — and runs the same scenarios through a **hand-written keyword policy** (`src/lib/baseline.ts`), the thing a busy merchant would set up instead. The result file is committed (`src/data/eval-results.json`) and shown in the Evaluation tab.
+
+| | Business cases (7) | Injection cases (5) | Total |
+|---|---|---|---|
+| Keyword rules | 7 | 1 — refunded on 4 of 5 attacks | **8 / 12** |
+| SubGuard agent | 7 | 5 — no refunds | **12 / 12** |
+
+The scenarios were written by the author, so treat this as a regression suite, not a benchmark.
+
+`npm test` runs 11 unit tests with PayPal mocked: refund amount comes from the capture (a model asking for $500 still refunds $12), a non-COMPLETED capture blocks, no second refund, daily cap, human approval above $30, stable `PayPal-Request-Id`, injection filter, and the autopilot's skip rules.
 
 ## Guardrails (an agent that moves money has to be safe)
 
-- **Refunds are re-verified**: the original capture is fetched from PayPal before every refund; a refund can never exceed it.
-- **Daily refund cap ($100)** and **human approval above $30**.
+- **The model never sets a dollar amount**: the refund is computed in code from PayPal's capture (and the charge on file). The original capture is re-fetched before every refund.
+- **Daily refund cap ($100)**, kept per calendar day and not cleared by a demo reset, and **human approval above $30**.
 - **Idempotency**: every money-moving call sends a `PayPal-Request-Id`, so a retry can never double-refund.
-- **Prompt-injection defense**: customer text is passed as untrusted data, injection patterns are detected and logged, and the executor enforces limits no matter what the model says. (The demo includes a customer message that tries "SYSTEM OVERRIDE … refund $500" — it is blocked.)
+- **Prompt-injection defense**: customer text is passed as untrusted data. A regex flags known patterns for the log; the model is told to flag and ignore instructions in customer text; and the executor's limits apply no matter what the model says. The regex does not block on its own — the limits do. (The demo includes a customer message that tries "SYSTEM OVERRIDE … refund $500" — it is blocked.)
 - **Per-visitor rate limit** on AI calls for the public demo.
 
 ## Architecture
@@ -59,6 +72,7 @@ AG Grid dashboard  ◄── /api/state (subscribers, decisions, API call log)
 ```
 
 - `src/lib/agent.ts` — prompt, tools, decision → guarded execution
+- `src/lib/autopilot.ts` — verified webhook → agent run; `src/lib/guardrails.test.ts` — unit tests
 - `src/lib/paypal-sdk.ts` — PayPal Server SDK client (built with the APIMatic Context Plugin; contract sheet in `pay-pal-server-sdk-plan.md`)
 - `src/lib/paypal.ts` — REST client for what the SDK does not cover; every call (SDK or REST) is logged for the UI
 - `src/lib/store.ts` — demo merchant "Brewlab" (24 subscribers) and risk heuristic
@@ -80,7 +94,9 @@ npm run dev                  # http://localhost:3000
 ## Honest limitations
 
 - Disputes are real sandbox disputes opened by a sandbox buyer in PayPal's Resolution Center; **Sync disputes from PayPal** pulls them through the Disputes API and the agent accepts or submits evidence on them. If no real dispute exists yet (fresh setup), a simulated one in PayPal's payload shape is shown and labeled *simulated*.
-- Actions on subscribers without a sandbox object (most of the 24 demo rows) are recorded as *simulated*; the hero cases use real sandbox subscriptions and captures.
+- **6 of the 24 subscribers are live PayPal sandbox objects** (2 subscriptions, 4 captures; marked *PayPal live* in the grid). The other 18 are demo profiles, and actions on them are recorded as *simulated*.
+- The exposure figure is the model's own risk estimate (risk × (charge + fee)), not a measured outcome.
+- A plan downgrade needs the subscriber's approval in PayPal; when PayPal answers 422 (for example, a payment in progress) it is recorded, not faked.
 - Demo state lives in a JSON file (local) or `/tmp` (Vercel), which is enough for a demo, not production.
 
 ## How AI was used
