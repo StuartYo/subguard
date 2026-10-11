@@ -5,7 +5,8 @@ import { load, save, PRICE } from "@/lib/store";
 import * as paypal from "@/lib/paypal";
 import * as sdk from "@/lib/paypal-sdk";
 
-const ORDERS = [{ sub: "sub_02", label: "Daniel – renewal charged yesterday" }, { sub: "sub_05", label: "Omar – last renewal (injection case)" }];
+const ORDERS = [{ sub: "sub_02", label: "Daniel – renewal charged yesterday" }, { sub: "sub_05", label: "Omar – last renewal (injection case)" },
+  { sub: "sub_03", label: "Priya – renewal (then open an ITEM NOT RECEIVED dispute as the buyer)" }, { sub: "sub_06", label: "Sofia – renewal (then open a dispute as the buyer)" }];
 const SUBS = [{ sub: "sub_01", label: "Mia – Pro subscription (pause case)" }, { sub: "sub_04", label: "Lena – Pro subscription (downgrade case)" }];
 
 export async function POST(req: Request) {

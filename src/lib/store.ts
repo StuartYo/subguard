@@ -38,6 +38,7 @@ export type Dispute = {
   amount: number; createdAt: string; buyerNote: string;
   facts: { deliveredShipments: number; lastLoginDaysAgo: number; trackingDelivered: boolean; reminderSentBeforeRenewal: boolean };
   status: "open" | "accepted" | "contested"; decision?: Decision; evidence?: string[];
+  realId?: string; paypalStatus?: string;   // set when the dispute exists in PayPal (opened by a sandbox buyer)
 };
 
 export type Store = {

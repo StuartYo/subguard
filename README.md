@@ -11,6 +11,11 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 - Every $1 of fraud costs US merchants $4.61 in total ([LexisNexis True Cost of Fraud 2025](https://risk.lexisnexis.com/global/en/about-us/press-room/press-release/20250402-tcof-ecommerce-and-retail)).
 - Each chargeback costs the merchant a fee (~$15), the goods, and pushes up its dispute ratio — too high and the account gets restricted. Small merchants have no team to watch this.
 
+What merchants say (public posts):
+- A SaaS founder on Hacker News: the processor *"reverses the charge, hits us with chargeback fee as well"* — and the bank sided with the customer even though they had cancelled late ([HN, 2025](https://news.ycombinator.com/item?id=44176700)).
+- A two-month-old Shopify subscription shop: 8 chargebacks on 725 orders put it at **1.10%**, already near the ~1% warning line ([Shopify Community, 2024](https://community.shopify.com/t/340361)).
+- Card-network monitoring programs start around **1.5%** disputes (Visa VAMP from 2026, Mastercard ECM; second-hand summaries: [Redo](https://redo.com/resources/articles/chargebacks/vamp-2026-shopify), [Chargebacks911](https://chargebacks911.com/mastercard-chargeback-threshold/)).
+
 Most "AI + payments" projects help a buyer pay. SubGuard works on the other side: it protects the merchant's revenue *after* the sale.
 
 ## What the agent does

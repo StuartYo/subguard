@@ -210,6 +210,20 @@ export async function decideDispute(store: Store, dp: Dispute): Promise<Decision
     guardrails: ["Dispute event simulated with PayPal's webhook payload shape (sandbox cannot open real disputes from a merchant app); the agent still queries the live PayPal Disputes API"],
     paypal: [], status: "simulated", investigation: steps,
   };
+  if (dp.realId) {
+    d.guardrails = [`Live PayPal dispute ${dp.realId} (opened by the sandbox buyer)`];
+    const n = paypal.apiCalls().length;
+    try {
+      if (r.action === "accept_dispute") { await paypal.acceptClaim(dp.realId, `Brewlab accepts this claim. ${r.reasoning}`); d.status = "executed"; }
+      else {
+        const NL = String.fromCharCode(10);
+        const notes = r.evidence.map((e, i) => `${i + 1}. ${e}`).join(NL);
+        await paypal.provideEvidence(dp.realId, notes).catch(async e => { d.guardrails.push(`provide-evidence unavailable in this dispute state (${String(e.message).split("failed: ")[1]}) → evidence sent as a dispute message`); await paypal.sendDisputeMessage(dp.realId!, `Evidence from Brewlab:${NL}${notes}`); });
+        d.status = "executed";
+      }
+    } catch (e: any) { d.status = "blocked"; d.guardrails.push(`PayPal error: ${String(e.message).slice(0, 120)}`); }
+    d.paypal = paypal.apiCalls().slice(n).map(c => `${c.method} ${c.path} → ${c.status}`);
+  }
   dp.status = r.action === "accept_dispute" ? "accepted" : "contested"; dp.decision = d; dp.evidence = r.evidence;
   return d;
 }

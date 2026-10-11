@@ -70,7 +70,19 @@ export const refundCapture = (captureId: string, amount: string, note: string, r
   pp("POST", `/v2/payments/captures/${captureId}/refund`, { amount: { value: amount, currency_code: "USD" }, note_to_payer: note.slice(0, 255) }, { requestId, summary: `refund $${amount}` });
 
 // ── Disputes ──
-export const listDisputes = () => pp("GET", "/v1/customer/disputes?dispute_state=OPEN_INQUIRIES,REQUIRED_ACTION,UNDER_PAYPAL_REVIEW&page_size=20", undefined, { summary: "list open disputes" });
+export const getDispute = (id: string) => pp("GET", `/v1/customer/disputes/${id}`, undefined, { summary: "read dispute" });
+export const acceptClaim = (id: string, note: string) => pp("POST", `/v1/customer/disputes/${id}/accept-claim`, { note: note.slice(0, 2000) }, { requestId: `accept-${id}`, summary: "accept dispute claim" });
+export const sendDisputeMessage = (id: string, message: string) => pp("POST", `/v1/customer/disputes/${id}/send-message`, { message: message.slice(0, 2000) }, { requestId: `msg-${id}-${message.length}`, summary: "send evidence message" });
+// provide-evidence is multipart: an "input" JSON part (documents optional for notes-only evidence)
+export async function provideEvidence(id: string, notes: string, evidenceType = "PROOF_OF_FULFILLMENT") {
+  const form = new FormData();
+  form.append("input", new Blob([JSON.stringify({ evidences: [{ evidence_type: evidenceType, notes: notes.slice(0, 2000) }] })], { type: "application/json" }));
+  const res = await fetch(`${BASE}/v1/customer/disputes/${id}/provide-evidence`, { method: "POST", headers: { Authorization: `Bearer ${await accessToken()}` }, body: form });
+  calls.push({ at: new Date().toISOString(), method: "POST", path: `/v1/customer/disputes/${id}/provide-evidence`, status: res.status, ok: res.ok, summary: "submit evidence" });
+  if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(`PayPal provide-evidence failed: ${j?.details?.[0]?.issue ?? j?.name ?? res.status}`); }
+  return res.json().catch(() => ({}));
+}
+export const listDisputes = () => pp("GET", "/v1/customer/disputes?page_size=50", undefined, { summary: "list open disputes" });
 
 // ── Webhooks: PayPal pushes real events (subscription suspended, refund completed, dispute created) ──
 export const WEBHOOK_EVENTS = ["BILLING.SUBSCRIPTION.SUSPENDED", "BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.UPDATED", "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.REFUNDED", "CUSTOMER.DISPUTE.CREATED", "CUSTOMER.DISPUTE.UPDATED"];

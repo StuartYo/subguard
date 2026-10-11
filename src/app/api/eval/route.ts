@@ -3,6 +3,8 @@
 import { NextResponse } from "next/server";
 import { decideForSubscriber } from "@/lib/agent";
 import type { Store, Subscriber } from "@/lib/store";
+import fs from "fs";
+import path from "path";
 
 const base = (p: Partial<Subscriber>): Subscriber => ({ id: "eval", name: "Test Customer", email: "t@example.com", plan: "Basic", monthsSubscribed: 6, lastActiveDays: 3, skippedShipments: 0, emailsUnopened: 0, renewalInDays: 15, lastChargeDaysAgo: null, status: "active", paypal: {}, decisions: [], ...p });
 const CASES: { name: string; sub: Subscriber; ok: (a: string, cost: number) => boolean; expect: string }[] = [
@@ -28,5 +30,7 @@ export async function POST() {
     const d = await decideForSubscriber(store, c.sub);
     rows.push({ case: c.name, expect: c.expect, got: `${d.action} ($${d.actionCost})`, pass: c.ok(d.action, d.actionCost), flaggedInjection: d.guardrails.some(g => g.includes("injection")) });
   }
-  return NextResponse.json({ passed: rows.filter(r => r.pass).length, total: rows.length, rows });
+  const out = { ranAt: new Date().toISOString(), passed: rows.filter(r => r.pass).length, total: rows.length, rows };
+  fs.writeFileSync(path.join(process.cwd(), "src", "data", "eval-results.json"), JSON.stringify(out, null, 2));
+  return NextResponse.json(out);
 }
