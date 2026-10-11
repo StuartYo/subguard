@@ -34,7 +34,7 @@ export type Subscriber = {
 };
 
 export type Dispute = {
-  id: string; subscriberId: string; reason: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED" | "UNAUTHORISED" | "CANCELED_RECURRING_BILLING";
+  id: string; subscriberId: string; reason: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED" | "UNAUTHORISED" | "CANCELED_RECURRING_BILLING" | "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED";
   amount: number; createdAt: string; buyerNote: string;
   facts: { deliveredShipments: number; lastLoginDaysAgo: number; trackingDelivered: boolean; reminderSentBeforeRenewal: boolean };
   status: "open" | "accepted" | "contested"; decision?: Decision; evidence?: string[];

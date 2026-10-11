@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { load, save, type Dispute } from "@/lib/store";
 import * as paypal from "@/lib/paypal";
-const REASON: Record<string, Dispute["reason"]> = { MERCHANDISE_OR_SERVICE_NOT_RECEIVED: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED", UNAUTHORISED: "UNAUTHORISED" };
+const REASON: Record<string, Dispute["reason"]> = { MERCHANDISE_OR_SERVICE_NOT_RECEIVED: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED", UNAUTHORISED: "UNAUTHORISED", MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED: "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED" };
 export async function POST() {
   const s = load();
   try {
@@ -14,7 +14,7 @@ export async function POST() {
       const x = s.subscribers.find(z => z.paypal.captureId === capId);
       if (!x) continue;
       const existing = s.disputes.find(d => d.realId === full.dispute_id);
-      if (existing) { existing.paypalStatus = full.status; continue; }
+      if (existing) { existing.paypalStatus = full.status; existing.reason = REASON[full.reason] ?? existing.reason; continue; }
       const sim = s.disputes.find(d => d.subscriberId === x.id && !d.realId);
       const dp: Dispute = {
         id: full.dispute_id, realId: full.dispute_id, paypalStatus: full.status, subscriberId: x.id,

@@ -82,7 +82,7 @@ export async function provideEvidence(id: string, notes: string, evidenceType = 
   if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(`PayPal provide-evidence failed: ${j?.details?.[0]?.issue ?? j?.name ?? res.status}`); }
   return res.json().catch(() => ({}));
 }
-export const listDisputes = () => pp("GET", "/v1/customer/disputes?page_size=50", undefined, { summary: "list open disputes" });
+export const listDisputes = () => pp("GET", `/v1/customer/disputes?page_size=50&start_time=${new Date(Date.now() - 90 * 864e5).toISOString()}`, undefined, { summary: "list open disputes" });
 
 // ── Webhooks: PayPal pushes real events (subscription suspended, refund completed, dispute created) ──
 export const WEBHOOK_EVENTS = ["BILLING.SUBSCRIPTION.SUSPENDED", "BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.UPDATED", "PAYMENT.CAPTURE.COMPLETED", "PAYMENT.CAPTURE.REFUNDED", "CUSTOMER.DISPUTE.CREATED", "CUSTOMER.DISPUTE.UPDATED"];
